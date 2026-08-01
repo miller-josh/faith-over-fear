@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/modernist-f3a15503-215d-4961-98d4-267adf6257ff/styles.css">
+<script src="_ds/modernist-f3a15503-215d-4961-98d4-267adf6257ff/_ds_bundle.js"></script>
+<style>
+  html, body { margin: 0; background: #f3f2f2; }
+  @keyframes ffPulse { 0%,100% { opacity: 1 } 50% { opacity: .35 } }
+  @keyframes ffIn { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+</style>
+</helmet>
+
+<div style="min-height:100vh;display:flex;flex-direction:column;font-family:var(--font-body);background:var(--color-bg);color:var(--color-text)">
+
+<sc-if value="{{ signedOut }}" hint-placeholder-val="{{ false }}">
+  <div style="flex:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">
+    <div style="color: #f3f2f2; padding: clamp(32px,6vw,72px); display: flex; flex-direction: column; justify-content: space-between; gap: 48px; min-height: 340px; background-color: #1B13EC91">
+      <div style="font-family:var(--font-heading);font-weight:800;font-size:13px;letter-spacing:0.18em;text-transform:uppercase">Faith over Fear</div>
+      <div>
+        <div style="font-family:var(--font-heading);font-weight:800;font-size:clamp(34px,5.2vw,60px);line-height:1.02;letter-spacing:-0.02em;text-wrap:balance">Name the fear.<br>Answer it with truth.</div>
+        <div style="height:2px;background:var(--color-text);margin:28px 0 20px;max-width:320px"></div>
+        <p style="margin:0;font-size:15px;max-width:38ch;opacity:.9">A private log of what you're afraid of, the truth you're choosing instead, and the verses you're standing on.</p>
+      </div>
+      <div style="font-size:11px;letter-spacing:0.1em;text-transform:uppercase;opacity:.75">Private by default · Only you</div>
+    </div>
+    <div style="padding:clamp(32px,6vw,72px);display:flex;flex-direction:column;justify-content:center">
+      <div style="width:100%;max-width:380px">
+        <h2 style="margin:0 0 6px">Sign in</h2>
+        <p class="text-muted" style="font-size:14px;margin-bottom:24px">Continue to your journal.</p>
+        <button class="btn btn-secondary btn-block" onClick="{{ signIn }}" style="justify-content:flex-start;gap:10px;min-height:42px;margin:0 0 10px">
+          <span style="width:16px;height:16px;border:2px solid var(--color-text);border-radius:50%;display:inline-block;flex:none"></span>
+          Continue with Google
+        </button>
+        <button class="btn btn-secondary btn-block" onClick="{{ signIn }}" style="justify-content:flex-start;gap:10px;min-height:42px;margin:0 0 20px">
+          <span style="width:16px;height:12px;border:2px solid var(--color-text);display:inline-block;flex:none"></span>
+          Continue with Apple
+        </button>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+          <div style="flex:1;height:1px;background:var(--color-divider)"></div>
+          <div class="text-muted" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase">or</div>
+          <div style="flex:1;height:1px;background:var(--color-divider)"></div>
+        </div>
+        <div class="field" style="margin-bottom:12px">
+          <label>Email address</label>
+          <input class="input" type="email" placeholder="you@example.com" style="min-height:42px">
+        </div>
+        <button class="btn btn-primary btn-block" onClick="{{ signIn }}" style="min-height:42px;justify-content:flex-start">Continue</button>
+        <p class="text-muted" style="font-size:11px;margin-top:20px">Secured by Clerk. No one else can read your entries.</p>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ signedIn }}" hint-placeholder-val="{{ true }}">
+<div style="flex:1;display:flex;flex-direction:column">
+
+  <header class="nav" style="position:sticky;top:0;z-index:20;background:var(--color-bg);flex-wrap:wrap;gap:16px;padding-inline:clamp(16px,4vw,40px)">
+    <div class="nav-brand" style="display:flex;align-items:baseline;gap:10px;margin-right:auto">
+      <span style="width: 10px; height: 10px; display: inline-block; background-color: #848EF0"></span>
+      Faith over Fear
+    </div>
+    <nav style="display:flex;align-items:center;gap:20px">
+      <a href="#" onClick="{{ goDashboard }}" style="font-family:var(--font-heading);font-weight:800;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:{{ navHomeColor }};text-decoration:none">Journal</a>
+      <a href="#" onClick="{{ goNew }}" style="font-family:var(--font-heading);font-weight:800;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:{{ navNewColor }};text-decoration:none">New entry</a>
+      <span style="width:30px;height:30px;background:var(--color-neutral-300);display:grid;place-items:center;font-size:11px;font-family:var(--font-heading);font-weight:800">JS</span>
+    </nav>
+  </header>
+
+  <main style="flex:1;width:100%;max-width:1120px;margin:0 auto;padding:clamp(20px,4vw,44px) clamp(16px,4vw,40px) 80px">
+
+  <sc-if value="{{ onDashboard }}" hint-placeholder-val="{{ true }}">
+    <div>
+      <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin-bottom:20px">
+        <div>
+          <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:8px">{{ todayLabel }}</div>
+          <h1 style="margin:0;font-size:clamp(30px,4.4vw,42px)">Your journal</h1>
+          <p class="text-muted" style="margin:8px 0 0;font-size:14px">{{ countLine }}</p>
+        </div>
+        <button class="btn btn-primary" onClick="{{ goNew }}" style="min-height:40px">＋ New entry</button>
+      </div>
+
+      <hr class="hr" style="margin:0 0 16px">
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px">
+        <input class="input" value="{{ query }}" onChange="{{ setQuery }}" placeholder="Search fears, truths, verses…" style="flex:1;min-width:220px;max-width:380px;min-height:38px">
+        <div class="seg">
+          <label class="seg-opt"><input type="radio" name="ffstatus" checked="{{ isAll }}" onChange="{{ filterAll }}">All</label>
+          <label class="seg-opt"><input type="radio" name="ffstatus" checked="{{ isActive }}" onChange="{{ filterActive }}">Active</label>
+          <label class="seg-opt"><input type="radio" name="ffstatus" checked="{{ isSurrendered }}" onChange="{{ filterSurrendered }}">Surrendered</label>
+          <label class="seg-opt"><input type="radio" name="ffstatus" checked="{{ isResolved }}" onChange="{{ filterResolved }}">Resolved</label>
+        </div>
+        <div class="seg" style="margin-left:auto">
+          <label class="seg-opt"><input type="radio" name="ffview" checked="{{ isListView }}" onChange="{{ showList }}">List</label>
+          <label class="seg-opt"><input type="radio" name="ffview" checked="{{ isCloudView }}" onChange="{{ showCloud }}">Topics</label>
+        </div>
+      </div>
+
+      <sc-if value="{{ hasTopicFilter }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+          <span class="tag tag-accent">{{ topicFilter }}</span>
+          <button class="btn btn-ghost" onClick="{{ clearTopic }}" style="font-size:12px">Clear topic filter ✕</button>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isCloudView }}" hint-placeholder-val="{{ false }}">
+        <div style="margin-bottom:32px">
+          <div style="border:2px solid var(--color-text);padding:clamp(28px,5vw,64px) clamp(20px,4vw,56px);background:var(--color-neutral-100)">
+            <div style="display:flex;flex-wrap:wrap;align-items:baseline;justify-content:center;gap:clamp(10px,2vw,18px) clamp(20px,4vw,44px);max-width:900px;margin:0 auto">
+              <sc-for list="{{ cloud }}" as="t" hint-placeholder-count="7">
+                <button onClick="{{ t.onPick }}" title="{{ t.meta }}" style="background:none;border:0;border-bottom:{{ t.rule }};padding:2px 0;cursor:pointer;font-family:var(--font-heading);font-weight:800;letter-spacing:-0.03em;line-height:0.95;font-size:{{ t.size }}px;color:{{ t.color }};transition:color .15s ease" style-hover="color:var(--color-accent-700)">{{ t.name }}<span style="font-family:var(--font-body);font-weight:400;font-size:11px;vertical-align:super;margin-left:3px;opacity:.5">{{ t.count }}</span></button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:clamp(16px,3vw,40px);flex-wrap:wrap;align-items:flex-start;border:2px solid var(--color-text);border-top:0;padding:18px clamp(20px,4vw,56px)">
+            <p style="margin:0;font-family:var(--font-heading);font-weight:800;font-size:15px;letter-spacing:-0.015em;max-width:34ch;text-wrap:pretty">{{ cloudLead }}</p>
+            <p class="text-muted" style="margin:0;font-size:12px;line-height:1.5;max-width:46ch;text-wrap:pretty">{{ cloudSub }}</p>
+          </div>
+
+          <div style="display:flex;flex-wrap:wrap;border:2px solid var(--color-text);border-top:0">
+            <sc-for list="{{ cloud }}" as="t" hint-placeholder-count="7">
+              <button onClick="{{ t.onPick }}" style="flex:1 1 150px;text-align:left;background:none;border:0;border-right:1px solid var(--color-divider);padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;gap:8px" style-hover="background:var(--color-neutral-200)">
+                <span style="font-family:var(--font-heading);font-weight:800;font-size:13px;color:var(--color-text)">{{ t.name }}</span>
+                <span style="display:block;width:100%;height:4px;background:var(--color-neutral-300)"><span style="display:block;height:4px;width:{{ t.bar }}%;background:var(--color-accent-solid)"></span></span>
+                <span class="text-muted" style="font-size:11px;letter-spacing:.06em;text-transform:uppercase">{{ t.meta }}</span>
+              </button>
+            </sc-for>
+          </div>
+
+          <div style="display:flex;align-items:baseline;gap:12px;margin-top:28px">
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700)">{{ cloudRowsLabel }}</div>
+            <div style="flex:1;height:2px;background:var(--color-text)"></div>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showRows }}" hint-placeholder-val="{{ true }}">
+        <div>
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+            <div onClick="{{ r.onOpen }}" style="display:flex;gap:clamp(14px,3vw,32px);flex-wrap:wrap;padding:20px 0;border-bottom:1px solid var(--color-divider);cursor:pointer;animation:ffIn .25s ease both">
+              <div style="width:86px;flex:none">
+                <div style="font-family:var(--font-heading);font-weight:800;font-size:13px;letter-spacing:.04em">{{ r.day }}</div>
+                <div class="text-muted" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase">{{ r.month }}</div>
+              </div>
+              <div style="flex:1;min-width:240px">
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+                  <span class="tag tag-neutral">{{ r.topic }}</span>
+                  <span class="{{ r.statusClass }}">{{ r.status }}</span>
+                </div>
+                <div style="font-family:var(--font-heading);font-weight:800;font-size:clamp(17px,2.2vw,21px);line-height:1.22;letter-spacing:-0.015em;margin-bottom:8px;text-wrap:pretty">{{ r.fear }}</div>
+                <div style="display:flex;gap:10px;align-items:flex-start">
+                  <span style="width: 2px; align-self: stretch; flex: none; background-color: #848EF0"></span>
+                  <p class="text-muted" style="margin:0;font-size:14px;max-width:62ch;text-wrap:pretty">{{ r.truth }}</p>
+                </div>
+              </div>
+              <div style="flex:none;min-width:120px;display:flex;flex-direction:column;gap:4px;align-items:flex-start">
+                <div class="text-muted" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase">{{ r.verseCount }}</div>
+                <div style="font-size:12px;color:var(--color-accent-700);line-height:1.5">{{ r.verseList }}</div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="border:2px dashed var(--color-divider);padding:clamp(32px,6vw,72px);text-align:left;margin-top:8px">
+          <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:10px">{{ emptyKicker }}</div>
+          <h3 style="margin:0 0 10px;max-width:20ch">{{ emptyTitle }}</h3>
+          <p class="text-muted" style="font-size:14px;max-width:52ch">{{ emptyBody }}</p>
+          <button class="btn btn-primary" onClick="{{ goNew }}" style="min-height:40px;margin-top:8px">Write the first one</button>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ onDetail }}" hint-placeholder-val="{{ false }}">
+    <div>
+      <button class="btn btn-ghost" onClick="{{ goDashboard }}" style="margin-bottom:20px;font-size:12px;letter-spacing:.08em;text-transform:uppercase">← Journal</button>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
+        <span class="tag tag-neutral">{{ current.topic }}</span>
+        <span class="{{ current.statusClass }}">{{ current.status }}</span>
+        <span class="text-muted" style="font-size:12px">Logged {{ current.fullDate }}</span>
+      </div>
+      <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:10px">The fear</div>
+      <h1 style="margin:0 0 28px;font-size:clamp(26px,4vw,40px);max-width:24ch;text-wrap:pretty">{{ current.fear }}</h1>
+      <hr class="hr" style="margin:0 0 28px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:clamp(24px,4vw,48px)">
+        <div>
+          <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:12px">The truth I'm choosing</div>
+          <p style="font-size:clamp(16px,2vw,19px);line-height:1.55;margin:0;max-width:46ch;text-wrap:pretty">{{ current.truth }}</p>
+        </div>
+        <div>
+          <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:12px">Standing on</div>
+          <div style="border-top:2px solid var(--color-divider)">
+            <sc-for list="{{ detailVerses }}" as="v" hint-placeholder-count="3">
+              <div style="border-bottom:1px solid var(--color-divider)">
+                <button onClick="{{ v.onToggle }}" style="width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;background:none;border:0;padding:14px 0;cursor:pointer;text-align:left;font-family:var(--font-heading);font-weight:800;font-size:15px;color:var(--color-text)">
+                  {{ v.ref }}
+                  <span style="color:var(--color-accent-700);font-size:16px">{{ v.marker }}</span>
+                </button>
+                <sc-if value="{{ v.open }}" hint-placeholder-val="{{ false }}">
+                  <p style="margin:0 0 16px;font-size:14px;line-height:1.6;max-width:48ch;padding-left:14px;border-left:2px solid var(--color-accent-solid);text-wrap:pretty">{{ v.text }}</p>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+      <hr class="hr" style="margin:36px 0 20px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <div class="text-muted" style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;margin-right:6px">Move to</div>
+        <button class="btn btn-secondary" onClick="{{ markActive }}">Active</button>
+        <button class="btn btn-secondary" onClick="{{ markSurrendered }}">Surrendered</button>
+        <button class="btn btn-secondary" onClick="{{ markResolved }}">Resolved</button>
+        <div style="margin-left:auto;display:flex;gap:10px">
+          <button class="btn btn-primary" onClick="{{ editCurrent }}">Edit</button>
+          <button class="btn btn-secondary" onClick="{{ askDelete }}">Delete</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ onEntry }}" hint-placeholder-val="{{ false }}">
+    <div style="max-width:760px">
+      <button class="btn btn-ghost" onClick="{{ goDashboard }}" style="margin-bottom:20px;font-size:12px;letter-spacing:.08em;text-transform:uppercase">← Journal</button>
+      <h1 style="margin:0 0 6px;font-size:clamp(28px,4vw,40px)">{{ entryTitle }}</h1>
+      <p class="text-muted" style="font-size:14px;margin-bottom:24px">Say it plainly. Then answer it.</p>
+      <hr class="hr" style="margin:0 0 28px">
+
+      <div style="margin-bottom:32px">
+        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:10px">
+          <span style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700)">01 — The fear</span>
+          <span class="text-muted" style="font-size:11px;margin-left:auto">{{ fearCount }}</span>
+        </div>
+        <input class="input" value="{{ draftFear }}" onChange="{{ setFear }}" placeholder="I'm afraid I will look like a fool if we fail." style="min-height:56px;font-size:clamp(16px,2.2vw,20px);font-family:var(--font-heading);font-weight:800;letter-spacing:-0.01em">
+        <sc-if value="{{ topicSuggested }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap">
+            <span class="text-muted" style="font-size:12px">Suggested topic</span>
+            <span class="tag tag-accent">{{ draftTopic }}</span>
+            <button class="btn btn-ghost" onClick="{{ cycleTopic }}" style="font-size:12px">Change</button>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="margin-bottom:32px">
+        <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:10px">02 — The truth I'm choosing</div>
+        <textarea class="input" value="{{ draftTruth }}" onChange="{{ setTruth }}" placeholder="Write the truth you're speaking over it — in your own words." style="min-height:130px;font-size:15px;line-height:1.6"></textarea>
+      </div>
+
+      <div style="margin-bottom:32px">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+          <span style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700)">03 — Verses to stand on</span>
+          <button class="btn btn-secondary" onClick="{{ suggest }}" disabled="{{ suggestDisabled }}" style="margin-left:auto">{{ suggestLabel }}</button>
+        </div>
+
+        <sc-if value="{{ suggesting }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px solid var(--color-divider);padding:20px;display:flex;align-items:center;gap:12px">
+            <span style="width:8px;height:8px;background:var(--color-accent-solid);display:inline-block;animation:ffPulse 1s ease-in-out infinite"></span>
+            <span class="text-muted" style="font-size:13px">Reading your fear and searching scripture…</span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ hasSuggestions }}" hint-placeholder-val="{{ false }}">
+          <div style="border:2px solid var(--color-accent-solid);padding:18px;margin-bottom:16px;animation:ffIn .3s ease both">
+            <div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-accent-700);margin-bottom:4px">Suggested for this fear</div>
+            <p class="text-muted" style="font-size:12px;margin-bottom:14px">Tap a reference to read it. Add the ones that land.</p>
+            <sc-for list="{{ suggestions }}" as="s" hint-placeholder-count="4">
+              <div style="border-top:1px solid var(--color-divider);padding:12px 0">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <button onClick="{{ s.onToggle }}" style="flex:1;text-align:left;background:none;border:0;padding:0;cursor:pointer;font-family:var(--font-heading);font-weight:800;font-size:15px;color:var(--color-text)">{{ s.ref }}</button>
+                  <span class="text-muted" style="font-size:11px">{{ s.why }}</span>
+                  <button class="btn btn-ghost" onClick="{{ s.onAdd }}" style="font-size:12px;white-space:nowrap">{{ s.addLabel }}</button>
+                </div>
+                <sc-if value="{{ s.open }}" hint-placeholder-val="{{ false }}">
+                  <p style="margin:10px 0 0;font-size:14px;line-height:1.6;padding-left:14px;border-left:2px solid var(--color-accent-300);max-width:52ch">{{ s.text }}</p>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+
+        <div style="border-top:2px solid var(--color-divider)">
+          <sc-for list="{{ draftVerses }}" as="v" hint-placeholder-count="2">
+            <div style="display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--color-divider)">
+              <span style="font-family:var(--font-heading);font-weight:800;font-size:15px;flex:none">{{ v.ref }}</span>
+              <span class="text-muted" style="font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ v.text }}</span>
+              <button class="btn btn-ghost" onClick="{{ v.onRemove }}" style="font-size:12px">Remove</button>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ noDraftVerses }}" hint-placeholder-val="{{ false }}">
+          <p class="text-muted" style="font-size:13px;padding:14px 0;border-bottom:1px solid var(--color-divider);margin:0">No verses yet. Add your own below, or let it suggest some.</p>
+        </sc-if>
+        <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap">
+          <input class="input" value="{{ manualRef }}" onChange="{{ setManualRef }}" placeholder="Add a reference — e.g. Psalm 27:1" style="flex:1;min-width:200px;max-width:320px">
+          <button class="btn btn-secondary" onClick="{{ addManual }}">Add verse</button>
+        </div>
+      </div>
+
+      <hr class="hr" style="margin:0 0 20px">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <button class="btn btn-primary" onClick="{{ save }}" disabled="{{ saveDisabled }}" style="min-height:42px">{{ saveLabel }}</button>
+        <button class="btn btn-secondary" onClick="{{ goDashboard }}" style="min-height:42px">Cancel</button>
+        <span class="text-muted" style="font-size:12px;margin-left:auto">{{ saveHint }}</span>
+      </div>
+    </div>
+  </sc-if>
+
+  </main>
+</div>
+</sc-if>
+
+<sc-if value="{{ confirming }}" hint-placeholder-val="{{ false }}">
+  <div class="dialog-backdrop" style="z-index:50">
+    <div class="dialog elev-lg">
+      <div class="dialog-title">Delete this entry?</div>
+      <div class="dialog-body">“{{ confirmText }}” and its truth statement will be removed. This can't be undone.</div>
+      <div class="dialog-actions">
+        <button class="btn btn-secondary" onClick="{{ cancelDelete }}">Keep it</button>
+        <button class="btn btn-primary" onClick="{{ confirmDelete }}">Delete</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1200,&quot;height&quot;:900},&quot;accentColor&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#132AEC80&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;options&quot;:[&quot;#132AEC80&quot;,&quot;#132AEC&quot;,&quot;#ec3013&quot;,&quot;#201E1D&quot;],&quot;section&quot;:&quot;Theme&quot;},&quot;defaultView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;list&quot;,&quot;options&quot;:[&quot;list&quot;,&quot;cloud&quot;],&quot;tsType&quot;:&quot;'list' | 'cloud'&quot;,&quot;section&quot;:&quot;Behavior&quot;},&quot;startSignedIn&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Behavior&quot;}}">
+const VERSES = {
+  "Proverbs 3:5-6": "Trust in the Lord with all your heart, and do not lean on your own understanding.",
+  "Psalm 34:5": "Those who look to him are radiant, and their faces shall never be ashamed.",
+  "2 Timothy 1:7": "God gave us a spirit not of fear but of power and love and self-control.",
+  "Isaiah 41:10": "Fear not, for I am with you; be not dismayed, for I am your God.",
+  "Psalm 56:3": "When I am afraid, I put my trust in you.",
+  "Matthew 6:33": "Seek first the kingdom of God, and all these things will be added to you.",
+  "Philippians 4:19": "And my God will supply every need of yours according to his riches in glory.",
+  "Isaiah 54:13": "All your children shall be taught by the Lord, and great shall be the peace of your children.",
+  "Proverbs 22:6": "Train up a child in the way he should go; even when he is old he will not depart from it.",
+  "Psalm 23:4": "Even though I walk through the valley of the shadow of death, I will fear no evil.",
+  "John 14:27": "Peace I leave with you; my peace I give to you. Let not your hearts be troubled.",
+  "Psalm 27:1": "The Lord is my light and my salvation; whom shall I fear?",
+  "Joshua 1:9": "Be strong and courageous. Do not be frightened, for the Lord your God is with you.",
+  "1 Peter 5:7": "Casting all your anxieties on him, because he cares for you.",
+  "Romans 8:31": "If God is for us, who can be against us?",
+  "Psalm 121:2": "My help comes from the Lord, who made heaven and earth.",
+  "Hebrews 13:5": "I will never leave you nor forsake you.",
+  "Galatians 1:10": "Am I now seeking the approval of man, or of God?",
+  "Matthew 11:28": "Come to me, all who labor and are heavy laden, and I will give you rest.",
+  "Lamentations 3:22-23": "His mercies never come to an end; they are new every morning."
+};
+
+const TOPICS = ["Work", "Health", "Provision", "Family", "The future", "Reputation", "Everyday"];
+
+const KEYS = [
+  { words: ["fool", "look", "fail", "embarrass", "shame", "judge", "opinion", "think of me"], topic: "Reputation",
+    refs: ["Psalm 34:5", "Galatians 1:10", "Proverbs 3:5-6", "2 Timothy 1:7"] },
+  { words: ["money", "afford", "pay", "job", "contract", "income", "bills", "rent"], topic: "Provision",
+    refs: ["Matthew 6:33", "Philippians 4:19", "Hebrews 13:5", "Psalm 121:2"] },
+  { words: ["sick", "test", "doctor", "cancer", "health", "pain", "surgery", "diagnos"], topic: "Health",
+    refs: ["Isaiah 41:10", "Psalm 56:3", "Psalm 23:4", "Lamentations 3:22-23"] },
+  { words: ["kid", "son", "daughter", "child", "wife", "husband", "family", "mom", "dad"], topic: "Family",
+    refs: ["Isaiah 54:13", "Proverbs 22:6", "1 Peter 5:7", "Psalm 121:2"] },
+  { words: ["work", "boss", "team", "project", "launch", "deadline", "meeting", "present"], topic: "Work",
+    refs: ["Proverbs 3:5-6", "Joshua 1:9", "2 Timothy 1:7", "Romans 8:31"] },
+  { words: ["fly", "plane", "drive", "alone", "dark", "night", "tomorrow"], topic: "Everyday",
+    refs: ["Psalm 23:4", "John 14:27", "Psalm 27:1", "1 Peter 5:7"] }
+];
+
+const DEFAULT_REFS = ["Isaiah 41:10", "Psalm 56:3", "John 14:27", "Philippians 4:19", "Joshua 1:9"];
+
+const SEED = [
+  { id: 1, fear: "I'm afraid I will look like a fool if we fail.", topic: "Reputation", status: "Active",
+    truth: "My name isn't on the line the way I think it is. I was not given a spirit of fear, and a failed launch doesn't get to tell me who I am.",
+    refs: ["Psalm 34:5", "2 Timothy 1:7", "Galatians 1:10"], date: "2026-07-28" },
+  { id: 2, fear: "I'm afraid the results will come back with bad news.", topic: "Health", status: "Surrendered",
+    truth: "I don't have to carry Thursday today. Whatever the result is, He is already there and already holding me.",
+    refs: ["Isaiah 41:10", "Psalm 56:3", "Lamentations 3:22-23"], date: "2026-07-21" },
+  { id: 3, fear: "I'm afraid the money runs out before the next contract lands.", topic: "Provision", status: "Active",
+    truth: "I've never once been dropped. Seeking Him first has never left me short — I'm going to work hard and stop rehearsing the worst case.",
+    refs: ["Matthew 6:33", "Philippians 4:19"], date: "2026-07-14" },
+  { id: 4, fear: "I'm afraid my kids will walk away from what we've taught them.", topic: "Family", status: "Active",
+    truth: "They are His before they are mine. My job is to be faithful in front of them, not to control the outcome.",
+    refs: ["Isaiah 54:13", "Proverbs 22:6", "1 Peter 5:7"], date: "2026-06-30" },
+  { id: 5, fear: "I'm afraid of the flight to Denver next week.", topic: "Everyday", status: "Resolved",
+    truth: "I've made this exact flight nine times. Peace is something I'm given, not something I have to manufacture at 30,000 feet.",
+    refs: ["Psalm 23:4", "John 14:27"], date: "2026-06-12" },
+  { id: 6, fear: "I'm afraid they'll finally see I don't know what I'm doing.", topic: "Reputation", status: "Active",
+    truth: "Everyone is figuring it out. Being found out as human is not a catastrophe — and I don't answer to the room.",
+    refs: ["Galatians 1:10", "Psalm 34:5"], date: "2026-07-24" },
+  { id: 7, fear: "I'm afraid I'll say the wrong thing in the review and it'll follow me.", topic: "Work", status: "Active",
+    truth: "One sentence doesn't define a career. I can prepare, speak plainly, and let it go.",
+    refs: ["Joshua 1:9", "Proverbs 3:5-6"], date: "2026-07-19" },
+  { id: 8, fear: "I'm afraid nobody will hire me again if this project sinks.", topic: "Reputation", status: "Surrendered",
+    truth: "My provision has never depended on one client's opinion of me.",
+    refs: ["Philippians 4:19", "Romans 8:31"], date: "2026-07-08" },
+  { id: 9, fear: "I'm afraid of the pain coming back before the surgery date.", topic: "Health", status: "Active",
+    truth: "I get today's grace today. I don't have to pre-suffer next month.",
+    refs: ["Lamentations 3:22-23", "Matthew 11:28"], date: "2026-07-02" },
+  { id: 10, fear: "I'm afraid I'll never be able to afford a house here.", topic: "Provision", status: "Active",
+    truth: "A roof is not the measure of whether I'm cared for. I've been fed every single day so far.",
+    refs: ["Matthew 6:33", "Hebrews 13:5"], date: "2026-06-26" },
+  { id: 11, fear: "I'm afraid of what the next ten years look like if nothing changes.", topic: "The future", status: "Active",
+    truth: "I'm not asked to see ten years. I'm asked to be faithful with this week.",
+    refs: ["Proverbs 3:5-6", "Psalm 121:2"], date: "2026-06-20" },
+  { id: 12, fear: "I'm afraid my dad's health will turn while I'm across the country.", topic: "Family", status: "Active",
+    truth: "Distance doesn't put him outside God's reach. I can call him tonight instead of rehearsing the worst.",
+    refs: ["Psalm 121:2", "1 Peter 5:7"], date: "2026-06-15" },
+  { id: 13, fear: "I'm afraid the tiredness means something is actually wrong.", topic: "Health", status: "Resolved",
+    truth: "The bloodwork came back clean. I was carrying a diagnosis I never had.",
+    refs: ["Psalm 56:3", "Isaiah 41:10"], date: "2026-06-04" },
+  { id: 14, fear: "I'm afraid I'm choosing wrong and I'll waste years finding out.", topic: "The future", status: "Surrendered",
+    truth: "There's no decision so bad it puts me out of reach. He redirects people who are moving.",
+    refs: ["Proverbs 3:5-6", "Isaiah 41:10"], date: "2026-05-28" },
+  { id: 15, fear: "I'm afraid the team will lose respect for me if I ask for help.", topic: "Work", status: "Resolved",
+    truth: "I asked. They helped. The thing I feared cost me nothing and the silence was costing me everything.",
+    refs: ["Romans 8:31", "Matthew 11:28"], date: "2026-05-19" }
+];
+
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const FULL = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+class Component extends DCLogic {
+  state = {
+    signedIn: null,
+    screen: "dashboard",
+    fears: SEED,
+    query: "",
+    status: "All",
+    topic: null,
+    view: null,
+    openVerse: {},
+    currentId: null,
+    editingId: null,
+    draft: null,
+    manualRef: "",
+    suggesting: false,
+    suggestions: null,
+    openSuggestion: {},
+    confirmId: null,
+    nextId: 6
+  };
+
+  componentDidMount() { this.applyAccent(); }
+  componentDidUpdate() { this.applyAccent(); }
+
+  applyAccent() {
+    const a = this.props.accentColor || "#132AEC80";
+    if (this._accent === a) return;
+    this._accent = a;
+    if (a === "#132AEC80") {
+      ["", "-solid", "-2", "-100", "-200", "-300", "-400", "-500", "-600", "-700", "-800", "-900",
+       "-2-100", "-2-800"].forEach(k => document.documentElement.style.removeProperty("--color-accent" + k));
+      return;
+    }
+    // ramp math runs on the opaque hue so hovers and small text stay legible;
+    // the accent itself keeps whatever alpha the tweak carries
+    const base = /^#[0-9a-f]{8}$/i.test(a) ? a.slice(0, 7) : a;
+    const mix = (pct, to) => "color-mix(in oklch, " + base + " " + pct + "%, " + to + ")";
+    const root = document.documentElement.style;
+    root.setProperty("--color-accent", a);
+    root.setProperty("--color-accent-solid", base);
+    root.setProperty("--color-accent-2", mix(80, "#ffffff"));
+    root.setProperty("--color-accent-100", mix(9, "#ffffff"));
+    root.setProperty("--color-accent-200", mix(20, "#ffffff"));
+    root.setProperty("--color-accent-300", mix(35, "#ffffff"));
+    root.setProperty("--color-accent-400", mix(55, "#ffffff"));
+    root.setProperty("--color-accent-500", mix(80, "#ffffff"));
+    root.setProperty("--color-accent-600", mix(86, "#000000"));
+    root.setProperty("--color-accent-700", mix(70, "#000000"));
+    root.setProperty("--color-accent-800", mix(52, "#000000"));
+    root.setProperty("--color-accent-900", mix(38, "#000000"));
+    root.setProperty("--color-accent-2-100", mix(9, "#ffffff"));
+    root.setProperty("--color-accent-2-800", mix(52, "#000000"));
+  }
+
+  statusClass(s) {
+    return s === "Active" ? "tag tag-outline" : s === "Surrendered" ? "tag tag-accent" : "tag tag-neutral";
+  }
+
+  parts(d) {
+    const [y, m, day] = d.split("-").map(Number);
+    return { day: String(day).padStart(2, "0"), month: MONTHS[m - 1], full: FULL[m - 1] + " " + day + ", " + y };
+  }
+
+  detectTopic(text) {
+    const t = (text || "").toLowerCase();
+    for (const k of KEYS) if (k.words.some(w => t.includes(w))) return k.topic;
+    return "The future";
+  }
+
+  matchRefs(text) {
+    const t = (text || "").toLowerCase();
+    const hit = KEYS.filter(k => k.words.some(w => t.includes(w)));
+    const refs = [];
+    hit.forEach(k => k.refs.forEach(r => { if (!refs.includes(r)) refs.push(r); }));
+    DEFAULT_REFS.forEach(r => { if (refs.length < 4 && !refs.includes(r)) refs.push(r); });
+    return refs.slice(0, 5);
+  }
+
+  blankDraft() { return { fear: "", truth: "", refs: [], topic: null, status: "Active" }; }
+
+  openEntry(id) {
+    const f = id ? this.state.fears.find(x => x.id === id) : null;
+    this.setState({
+      screen: "entry", editingId: id || null, suggestions: null, openSuggestion: {}, manualRef: "",
+      draft: f ? { fear: f.fear, truth: f.truth, refs: f.refs.slice(), topic: f.topic, status: f.status } : this.blankDraft()
+    });
+  }
+
+  renderVals() {
+    const s = this.state;
+    this.applyAccent();
+    const signedIn = s.signedIn === null ? !!this.props.startSignedIn : s.signedIn;
+    const view = s.view || this.props.defaultView || "list";
+    const d = s.draft || this.blankDraft();
+    const q = s.query.trim().toLowerCase();
+
+    let list = s.fears.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+    if (s.status !== "All") list = list.filter(f => f.status === s.status);
+    if (s.topic) list = list.filter(f => f.topic === s.topic);
+    if (q) list = list.filter(f =>
+      (f.fear + " " + f.truth + " " + f.topic + " " + f.refs.join(" ") + " " + f.refs.map(r => VERSES[r] || "").join(" ")).toLowerCase().includes(q));
+
+    const rows = list.map(f => {
+      const p = this.parts(f.date);
+      return {
+        ...f, day: p.day, month: p.month,
+        statusClass: this.statusClass(f.status),
+        verseCount: f.refs.length + (f.refs.length === 1 ? " verse" : " verses"),
+        verseList: f.refs.join(" · "),
+        onOpen: () => this.setState({ screen: "detail", currentId: f.id, openVerse: {} })
+      };
+    });
+
+    const stats = {};
+    s.fears.forEach(f => {
+      const t = (stats[f.topic] = stats[f.topic] || { n: 0, active: 0, surrendered: 0, resolved: 0 });
+      t.n++; t[f.status.toLowerCase()]++;
+    });
+    const names = Object.keys(stats);
+    const max = Math.max(1, ...names.map(n => stats[n].n));
+    const min = Math.min(...names.map(n => stats[n].n), max);
+    // Alternate big/small so the cloud reads as a cloud, not a sorted chart
+    const byWeight = names.slice().sort((a, b) => stats[b].n - stats[a].n || a.localeCompare(b));
+    const woven = [];
+    byWeight.forEach((n, i) => (i % 2 ? woven.push(n) : woven.unshift(n)));
+
+    const cloud = woven.map(name => {
+      const t = stats[name];
+      const ratio = max === min ? 1 : (t.n - min) / (max - min);
+      const live = t.active / t.n;
+      const on = s.topic === name;
+      const dim = s.topic && !on;
+      return {
+        name, count: t.n,
+        size: Math.round(26 + ratio * 46),
+        // Unanswered topics carry the accent; worked-through ones recede to ink
+        color: on ? "var(--color-accent)"
+             : dim ? "color-mix(in srgb, var(--color-text) 52%, transparent)"
+             : live > 0.6 ? "var(--color-accent)"
+             : live > 0.2 ? "color-mix(in srgb, var(--color-text) 85%, transparent)"
+             : "color-mix(in srgb, var(--color-text) 68%, transparent)",
+        rule: on ? "2px solid var(--color-accent-solid)" : "2px solid transparent",
+        meta: t.n + " logged · " + t.active + " active",
+        bar: Math.round((t.active / t.n) * 100),
+        onPick: () => this.setState({ topic: s.topic === name ? null : name, view: "cloud" })
+      };
+    });
+    const legendTopic = byWeight[0];
+    const legendActive = s.fears.filter(f => f.status === "Active").length;
+
+    const cur = s.fears.find(f => f.id === s.currentId) || s.fears[0] || SEED[0];
+    const detailVerses = (cur.refs || []).map(r => ({
+      ref: r, text: VERSES[r] || "Verse text will load from the API.",
+      open: !!s.openVerse[r], marker: s.openVerse[r] ? "−" : "+",
+      onToggle: () => this.setState(st => ({ openVerse: { ...st.openVerse, [r]: !st.openVerse[r] } }))
+    }));
+
+    const suggestions = (s.suggestions || []).map(r => ({
+      ref: r, text: VERSES[r] || "",
+      why: d.refs.includes(r) ? "added" : "",
+      open: !!s.openSuggestion[r],
+      addLabel: d.refs.includes(r) ? "✓ Added" : "+ Add",
+      onToggle: () => this.setState(st => ({ openSuggestion: { ...st.openSuggestion, [r]: !st.openSuggestion[r] } })),
+      onAdd: () => this.setState(st => {
+        const refs = st.draft.refs.includes(r) ? st.draft.refs.filter(x => x !== r) : [...st.draft.refs, r];
+        return { draft: { ...st.draft, refs } };
+      })
+    }));
+
+    const draftVerses = d.refs.map(r => ({
+      ref: r, text: VERSES[r] || "Added manually",
+      onRemove: () => this.setState(st => ({ draft: { ...st.draft, refs: st.draft.refs.filter(x => x !== r) } }))
+    }));
+
+    const setStatus = st => this.setState({ status: st });
+    const total = s.fears.length;
+    const activeN = s.fears.filter(f => f.status === "Active").length;
+    const noneAtAll = total === 0;
+
+    return {
+      signedIn: signedIn, signedOut: !signedIn,
+      signIn: e => { if (e) e.preventDefault(); this.setState({ signedIn: true }); },
+      onDashboard: s.screen === "dashboard", onDetail: s.screen === "detail", onEntry: s.screen === "entry",
+      goDashboard: e => { if (e) e.preventDefault(); this.setState({ screen: "dashboard" }); },
+      goNew: e => { if (e) e.preventDefault(); this.openEntry(null); },
+      navHomeColor: s.screen === "dashboard" ? "var(--color-accent-700)" : "var(--color-text)",
+      navNewColor: s.screen === "entry" ? "var(--color-accent-700)" : "var(--color-text)",
+
+      todayLabel: "Saturday, August 1",
+      countLine: noneAtAll ? "Nothing logged yet." : total + " entries · " + activeN + " still active · " + (total - activeN) + " answered",
+      query: s.query,
+      setQuery: e => this.setState({ query: e.target.value }),
+      isAll: s.status === "All", isActive: s.status === "Active",
+      isSurrendered: s.status === "Surrendered", isResolved: s.status === "Resolved",
+      filterAll: () => setStatus("All"), filterActive: () => setStatus("Active"),
+      filterSurrendered: () => setStatus("Surrendered"), filterResolved: () => setStatus("Resolved"),
+      isListView: view === "list", isCloudView: view === "cloud",
+      showList: () => this.setState({ view: "list" }), showCloud: () => this.setState({ view: "cloud" }),
+      hasTopicFilter: !!s.topic, topicFilter: s.topic || "",
+      clearTopic: e => { if (e) e.preventDefault(); this.setState({ topic: null }); },
+      cloud, rows,
+      cloudLead: legendTopic ? "“" + legendTopic + "” is the loudest thing on the list right now." : "",
+      cloudSub: legendActive + " of " + total + " entries are still unanswered. Size shows how often a topic comes up; blue means most of it is still active.",
+      cloudRowsLabel: s.topic ? s.topic : "All entries",
+      showRows: rows.length > 0,
+      isEmpty: rows.length === 0,
+      emptyKicker: noneAtAll ? "Start here" : "Nothing matches",
+      emptyTitle: noneAtAll ? "No fears written down yet" : "No entries match that",
+      emptyBody: noneAtAll
+        ? "Write the thing you're actually afraid of, in the words you'd use out loud. Then answer it with what's true."
+        : "Try a different search, status, or clear the topic filter.",
+
+      current: { ...cur, statusClass: this.statusClass(cur.status), fullDate: this.parts(cur.date).full },
+      detailVerses,
+      markActive: () => this.setStatusOf("Active"),
+      markSurrendered: () => this.setStatusOf("Surrendered"),
+      markResolved: () => this.setStatusOf("Resolved"),
+      editCurrent: () => this.openEntry(cur.id),
+      askDelete: () => this.setState({ confirmId: cur.id }),
+      confirming: s.confirmId != null,
+      confirmText: (s.fears.find(f => f.id === s.confirmId) || {}).fear || "",
+      cancelDelete: () => this.setState({ confirmId: null }),
+      confirmDelete: () => this.setState(st => ({
+        fears: st.fears.filter(f => f.id !== st.confirmId), confirmId: null, screen: "dashboard"
+      })),
+
+      entryTitle: s.editingId ? "Edit entry" : "New entry",
+      draftFear: d.fear, draftTruth: d.truth, draftTopic: d.topic || "",
+      topicSuggested: !!d.topic,
+      fearCount: d.fear.length ? d.fear.length + " characters" : "",
+      setFear: e => {
+        const v = e.target.value;
+        this.setState(st => ({ draft: { ...st.draft, fear: v, topic: v.trim().length > 12 ? this.detectTopic(v) : null } }));
+      },
+      setTruth: e => { const v = e.target.value; this.setState(st => ({ draft: { ...st.draft, truth: v } })); },
+      cycleTopic: e => {
+        if (e) e.preventDefault();
+        this.setState(st => {
+          const i = TOPICS.indexOf(st.draft.topic);
+          return { draft: { ...st.draft, topic: TOPICS[(i + 1) % TOPICS.length] } };
+        });
+      },
+      suggest: () => {
+        if (!d.fear.trim()) return;
+        this.setState({ suggesting: true, suggestions: null });
+        setTimeout(() => this.setState(st => ({ suggesting: false, suggestions: this.matchRefs(st.draft.fear) })), 1100);
+      },
+      suggestLabel: s.suggesting ? "Searching…" : (s.suggestions ? "Suggest again" : "✦ Suggest verses"),
+      suggestDisabled: !d.fear.trim() || s.suggesting,
+      suggesting: s.suggesting,
+      hasSuggestions: !!(s.suggestions && s.suggestions.length && !s.suggesting),
+      suggestions, draftVerses,
+      noDraftVerses: d.refs.length === 0,
+      manualRef: s.manualRef,
+      setManualRef: e => this.setState({ manualRef: e.target.value }),
+      addManual: () => this.setState(st => {
+        const r = st.manualRef.trim();
+        if (!r || st.draft.refs.includes(r)) return { manualRef: "" };
+        return { manualRef: "", draft: { ...st.draft, refs: [...st.draft.refs, r] } };
+      }),
+      saveLabel: s.editingId ? "Save changes" : "Save entry",
+      saveDisabled: !d.fear.trim() || !d.truth.trim(),
+      saveHint: !d.fear.trim() ? "A fear is required." : (!d.truth.trim() ? "Add the truth you're choosing." : "Saved privately to your journal."),
+      save: () => this.save()
+    };
+  }
+
+  setStatusOf(status) {
+    this.setState(st => ({
+      fears: st.fears.map(f => (f.id === st.currentId ? { ...f, status } : f))
+    }));
+  }
+
+  save() {
+    this.setState(st => {
+      const d = st.draft;
+      if (!d.fear.trim() || !d.truth.trim()) return {};
+      const topic = d.topic || this.detectTopic(d.fear);
+      if (st.editingId) {
+        return {
+          fears: st.fears.map(f => (f.id === st.editingId ? { ...f, ...d, topic } : f)),
+          screen: "detail", currentId: st.editingId, editingId: null, draft: null, openVerse: {}
+        };
+      }
+      const id = st.nextId;
+      const now = new Date();
+      const date = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
+      return {
+        fears: [{ id, fear: d.fear, truth: d.truth, refs: d.refs, topic, status: "Active", date }, ...st.fears],
+        nextId: id + 1, screen: "detail", currentId: id, draft: null, openVerse: {}
+      };
+    });
+  }
+}
+
+</script>
+</body>
+</html>
