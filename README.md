@@ -124,9 +124,10 @@ Status tags: Active → `.tag-outline` · Surrendered → `.tag-accent` · Resol
 - Kicker "The fear", h1 clamp(26px,4vw,40px) at max 24ch. 2px rule.
 - Two columns `repeat(auto-fit, minmax(280px,1fr))`, gap clamp(24px,4vw,48px):
   left "The truth I'm choosing" at clamp(16px,2vw,19px)/1.55, max 46ch; right "Standing on",
-  an accordion of references — reference 15px/800 flush left, +/− accent marker right, 1px
-  rules between, expanding to the verse text at 14px/1.6 behind a 2px accent left rule.
-  **Collapsed by default: reference only.**
+  an accordion of references — reference 15px/800 flush left, a per-verse translation picker
+  and +/− accent marker on the right, 1px rules between, expanding to the verse text at
+  14px/1.6 behind a 2px accent left rule. **Collapsed by default: reference only.** Changing a
+  verse's translation re-fetches that passage in the chosen translation and persists it.
 - Footer after a 2px rule: "Move to" + three secondary status buttons; right-aligned primary
   "Edit" and secondary "Delete".
 
@@ -142,8 +143,9 @@ Single 760px column, three numbered sections, each with an accent kicker.
   Loading: a 1px-bordered strip with an 8px accent square pulsing (`ffPulse`, 1s ease-in-out
   infinite) beside "Reading your fear and searching scripture…". Results: a 2px accent-
   bordered panel of 4–5 references; each row is a reference button (tap to expand the text)
-  plus a "+ Add" / "✓ Added" ghost toggle. Below it, the chosen verses each with "Remove",
-  then a manual "Add a reference — e.g. Psalm 27:1" input + "Add verse".
+  plus a "+ Add" / "✓ Added" ghost toggle. Below it, the chosen verses each with a per-verse
+  translation picker and "Remove", then a manual "Add a reference — e.g. Psalm 27:1" input +
+  "Add verse".
 - Footer: primary Save (disabled until fear AND truth are non-empty), secondary Cancel, and
   a right-aligned hint explaining any block. Saving routes to the detail view.
 
@@ -192,11 +194,12 @@ create table fears (
   updated_at timestamptz not null default now()
 );
 create table fear_verses (
-  id        uuid primary key default gen_random_uuid(),
-  fear_id   uuid references fears(id) on delete cascade,
-  reference text not null,                     -- "Psalm 34:5"
-  text      text,                              -- cached verse text
-  position  int  not null default 0
+  id          uuid primary key default gen_random_uuid(),
+  fear_id     uuid references fears(id) on delete cascade,
+  reference   text not null,                   -- "Psalm 34:5"
+  translation text not null default 'web',     -- per-verse translation code
+  text        text,                            -- cached verse text
+  position    int  not null default 0
 );
 create index on fears (user_id, created_at desc);
 ```

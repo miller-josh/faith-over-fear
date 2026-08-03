@@ -5,7 +5,15 @@ export type Status = 'Active' | 'Surrendered' | 'Resolved';
 
 export interface Verse {
   reference: string;
+  translation: string;
   text: string | null;
+}
+
+// A verse reference plus the translation chosen for it, as edited in the form
+// and sent to the API.
+export interface VerseRef {
+  reference: string;
+  translation: string;
 }
 
 export interface Fear {
@@ -34,5 +42,5 @@ export interface Draft {
   fear: string;
   truth: string;
   topic: string | null;
-  refs: string[];
+  refs: VerseRef[];
 }

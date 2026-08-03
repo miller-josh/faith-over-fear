@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { detectTopic, TOPICS } from './topics.js';
-import { hydrateVerses } from './bible.js';
+import { hydrateVerses, verseKey } from './bible.js';
+import { DEFAULT_TRANSLATION } from './translations.js';
 
 // Server-side AI verse suggestion.
 //
@@ -104,15 +105,18 @@ async function askModel(fear: string): Promise<{ topic: string; verses: ModelVer
 export async function suggestVerses(fear: string): Promise<SuggestResult> {
   const { topic, verses } = await askModel(fear);
 
-  const references = verses.map((v) => v.reference);
-  const texts = await hydrateVerses(references);
+  // Suggestions are previewed in the default translation; the reader picks a
+  // per-verse translation later, on the entry form or the detail view.
+  const texts = await hydrateVerses(
+    verses.map((v) => ({ reference: v.reference, translation: DEFAULT_TRANSLATION })),
+  );
 
   return {
     topic,
     verses: verses.map((v) => ({
       reference: v.reference,
       why: v.why,
-      text: texts[v.reference.trim()] || '',
+      text: texts[verseKey(v.reference, DEFAULT_TRANSLATION)] || '',
     })),
   };
 }

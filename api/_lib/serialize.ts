@@ -9,7 +9,7 @@ export interface FearDTO {
   topic: string;
   status: string;
   createdAt: string;
-  verses: { reference: string; text: string | null }[];
+  verses: { reference: string; translation: string; text: string | null }[];
 }
 
 export function serializeFear(row: FearRow, verses: VerseRow[]): FearDTO {
@@ -23,7 +23,7 @@ export function serializeFear(row: FearRow, verses: VerseRow[]): FearDTO {
     verses: verses
       .slice()
       .sort((a, b) => a.position - b.position)
-      .map((v) => ({ reference: v.reference, text: v.text })),
+      .map((v) => ({ reference: v.reference, translation: v.translation, text: v.text })),
   };
 }
 

@@ -15,12 +15,16 @@ create table if not exists fears (
 );
 
 create table if not exists fear_verses (
-  id        uuid primary key default gen_random_uuid(),
-  fear_id   uuid references fears(id) on delete cascade,
-  reference text not null,                     -- "Psalm 34:5"
-  text      text,                              -- cached verse text
-  position  int  not null default 0
+  id          uuid primary key default gen_random_uuid(),
+  fear_id     uuid references fears(id) on delete cascade,
+  reference   text not null,                   -- "Psalm 34:5"
+  translation text not null default 'web',     -- per-verse translation code
+  text        text,                            -- cached verse text
+  position    int  not null default 0
 );
+
+-- Backfill for databases created before the translation column existed.
+alter table fear_verses add column if not exists translation text not null default 'web';
 
 create index if not exists fears_user_created_idx on fears (user_id, created_at desc);
 create index if not exists fear_verses_fear_idx on fear_verses (fear_id, position);
