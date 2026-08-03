@@ -263,7 +263,7 @@ export default function EntryForm() {
               >
                 {TRANSLATIONS.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.label}
+                    {t.short}
                   </option>
                 ))}
               </select>

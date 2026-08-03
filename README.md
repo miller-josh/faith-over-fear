@@ -197,7 +197,7 @@ create table fear_verses (
   id          uuid primary key default gen_random_uuid(),
   fear_id     uuid references fears(id) on delete cascade,
   reference   text not null,                   -- "Psalm 34:5"
-  translation text not null default 'web',     -- per-verse translation code
+  translation text not null default 'kjv',     -- per-verse translation code
   text        text,                            -- cached verse text
   position    int  not null default 0
 );
@@ -208,6 +208,17 @@ Endpoints: `GET/POST /api/fears`, `GET/PATCH/DELETE /api/fears/:id`,
 Gate every route on the Clerk session and scope by `user_id`. The cloud's counts should come
 from a single aggregate query (`select topic, status, count(*) … group by 1,2`), not by
 counting client-side over a paginated list.
+
+## Bible translations
+Verses are stored with a per-verse `translation` and hydrated through a small
+provider layer in `api/_lib/bible.ts`. The picker offers **ESV, KJV, NIV, NKJV, NASB**.
+Only **KJV** is public domain and works with no key (via bible-api.com). **ESV** comes
+from the Crossway ESV API (`ESV_API_KEY`); **NIV/NKJV/NASB** from API.Bible
+(`API_BIBLE_KEY` + a per-translation bible id) — all copyrighted and off until their
+keys are set. Each hydrated passage is cached in `verse_cache` by (reference,
+translation). When a translation has no configured provider, the API marks the verse
+`available: false` and the detail view explains the missing text instead of hanging.
+See `.env.example` for the keys.
 
 ## AI verse suggestion
 The prototype fakes it with keyword→reference matching (see `KEYS` in the logic class) so the

@@ -1,34 +1,36 @@
-// The Bible translations a verse can be shown in. All are public-domain and
-// served by bible-api.com without an API key. Mirrored on the frontend in
+// The Bible translations a verse can be shown in. Mirrored on the frontend in
 // src/lib/translations.ts — keep the two lists in sync.
+//
+// Only KJV is public domain and served for free. ESV, NIV, NKJV, and NASB are
+// copyrighted and require a licensed provider + API key (see bible.ts and
+// .env.example); until one is configured the app shows a "not set up yet" note
+// rather than the verse text.
 
 export interface Translation {
-  id: string; // bible-api.com translation code
+  id: string; // internal translation code
   label: string; // shown in the picker
+  short: string; // compact label / abbreviation
 }
 
 export const TRANSLATIONS: Translation[] = [
-  { id: 'web', label: 'World English Bible' },
-  { id: 'kjv', label: 'King James Version' },
-  { id: 'bbe', label: 'Bible in Basic English' },
-  { id: 'webbe', label: 'WEB · British Edition' },
-  { id: 'oeb-us', label: 'Open English Bible · US' },
-  { id: 'oeb-cw', label: 'Open English Bible · CW' },
-  { id: 'clementine', label: 'Clementine Latin Vulgate' },
-  { id: 'almeida', label: 'João Ferreira de Almeida' },
-  { id: 'rccv', label: 'Romanian Corrected Cornilescu' },
+  { id: 'esv', label: 'English Standard Version', short: 'ESV' },
+  { id: 'kjv', label: 'King James Version', short: 'KJV' },
+  { id: 'niv', label: 'New International Version', short: 'NIV' },
+  { id: 'nkjv', label: 'New King James Version', short: 'NKJV' },
+  { id: 'nasb', label: 'New American Standard Bible', short: 'NASB' },
 ];
 
 const IDS = new Set(TRANSLATIONS.map((t) => t.id));
 
-// The fallback translation for verses that don't specify one. Honors the
-// BIBLE_TRANSLATION env override when it names a supported translation.
+// The fallback translation for verses that don't specify one. Defaults to KJV
+// (the only one that works without an API key); honors the BIBLE_TRANSLATION
+// env override when it names a supported translation.
 const envDefault = process.env.BIBLE_TRANSLATION;
 export const DEFAULT_TRANSLATION =
-  envDefault && IDS.has(envDefault) ? envDefault : 'web';
+  envDefault && IDS.has(envDefault) ? envDefault : 'kjv';
 
 // Coerces arbitrary input to a supported translation id, falling back to the
-// default. Keeps untrusted client values from reaching the Bible API.
+// default. Keeps untrusted client values from reaching a Bible provider.
 export function normalizeTranslation(value: unknown): string {
   return typeof value === 'string' && IDS.has(value) ? value : DEFAULT_TRANSLATION;
 }

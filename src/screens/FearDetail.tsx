@@ -142,7 +142,7 @@ export default function FearDetail() {
                     >
                       {TRANSLATIONS.map((t) => (
                         <option key={t.id} value={t.id}>
-                          {t.label}
+                          {t.short}
                         </option>
                       ))}
                     </select>
@@ -159,7 +159,13 @@ export default function FearDetail() {
                         textWrap: 'pretty',
                       }}
                     >
-                      {isChanging ? 'Loading this translation…' : (v.text ?? 'Verse text will load shortly.')}
+                      {isChanging
+                        ? 'Loading this translation…'
+                        : v.text
+                          ? v.text
+                          : v.available
+                            ? 'Verse text will load shortly.'
+                            : 'This translation isn’t set up yet — it needs a licensed API key on the server before its text can show. King James is available now.'}
                     </p>
                   )}
                 </div>

@@ -7,6 +7,9 @@ export interface Verse {
   reference: string;
   translation: string;
   text: string | null;
+  // False when this translation has no configured provider on the server, so
+  // the text can't be shown until an API key is added.
+  available: boolean;
 }
 
 // A verse reference plus the translation chosen for it, as edited in the form
