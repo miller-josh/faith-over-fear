@@ -22,6 +22,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(200).json(result);
   } catch (err) {
     console.error('suggest-verses failed:', err);
+    // A missing API key is a server misconfiguration, not an unreachable
+    // upstream — surface it distinctly so it isn't mistaken for a network fault.
+    if (err instanceof Error && err.message.includes('ANTHROPIC_API_KEY')) {
+      res.status(500).json({ error: 'Verse suggestions are not configured on the server.' });
+      return;
+    }
+    // A 400 from the Anthropic API is a request/account problem (e.g. an
+    // exhausted credit balance), not an unreachable service — the full detail
+    // is logged above for the operator. Keep the client message actionable.
+    if ((err as { status?: unknown }).status === 400) {
+      res.status(502).json({
+        error: 'The suggestion service rejected the request. Check the server logs and Anthropic billing.',
+      });
+      return;
+    }
     res.status(502).json({ error: 'Could not reach the suggestion service. Try again.' });
   }
 }

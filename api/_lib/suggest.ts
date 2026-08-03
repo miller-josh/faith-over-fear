@@ -78,7 +78,9 @@ interface ModelVerse {
 async function askModel(fear: string): Promise<{ topic: string; verses: ModelVerse[] }> {
   const response = await getClient().messages.create({
     model: MODEL,
-    max_tokens: 1024,
+    // Room for the structured JSON; on models where thinking is on by default
+    // a tighter cap can truncate the output and break JSON.parse below.
+    max_tokens: 2048,
     system: SYSTEM,
     // Keep latency low for the loading strip; the task is simple extraction.
     output_config: {
@@ -86,7 +88,7 @@ async function askModel(fear: string): Promise<{ topic: string; verses: ModelVer
       format: { type: 'json_schema', schema: SCHEMA },
     },
     messages: [{ role: 'user', content: `The fear:\n\n${fear.trim()}` }],
-  } as Anthropic.MessageCreateParamsNonStreaming);
+  });
 
   const textBlock = response.content.find((b) => b.type === 'text');
   if (!textBlock || textBlock.type !== 'text') {
