@@ -25,6 +25,7 @@ export interface VerseRow {
   id: string;
   fear_id: string;
   reference: string;
+  translation: string;
   text: string | null;
   position: number;
 }

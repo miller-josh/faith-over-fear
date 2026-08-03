@@ -3,12 +3,13 @@ import { sql, type FearRow, type VerseRow } from '../_lib/db.js';
 import { requireUser, readBody, methodNotAllowed } from '../_lib/http.js';
 import { serializeFear } from '../_lib/serialize.js';
 import { detectTopic } from '../_lib/topics.js';
+import { normalizeRefs, type NormalizedRef } from '../_lib/translations.js';
 
 interface CreateBody {
   fear?: string;
   truth?: string;
   topic?: string;
-  refs?: string[];
+  refs?: unknown;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -55,7 +56,7 @@ async function create(userId: string, req: VercelRequest, res: VercelResponse) {
     return;
   }
   const topic = (body.topic ?? '').trim() || detectTopic(fear);
-  const refs = Array.isArray(body.refs) ? body.refs.map((r) => r.trim()).filter(Boolean) : [];
+  const refs = normalizeRefs(body.refs);
 
   const inserted = (await sql`
     insert into fears (user_id, fear, truth, topic, status)
@@ -64,18 +65,28 @@ async function create(userId: string, req: VercelRequest, res: VercelResponse) {
   `) as FearRow[];
   const row = inserted[0];
 
-  let verses: VerseRow[] = [];
-  if (refs.length) {
-    // Fill verse text from the cache when we already have it; leave the rest to
-    // be hydrated lazily on the detail view.
-    verses = (await sql`
-      insert into fear_verses (fear_id, reference, position, text)
-      select ${row.id}::uuid, r.reference, r.position,
-             (select text from verse_cache vc where vc.reference = r.reference limit 1)
-      from unnest(${refs}::text[]) with ordinality as r(reference, position)
-      returning *
-    `) as VerseRow[];
-  }
+  const verses = await insertVerses(row.id, refs);
 
   res.status(201).json({ fear: serializeFear(row, verses) });
+}
+
+// Inserts a fear's verses, filling text from the (reference, translation)
+// cache when we already have it; the rest hydrate lazily on the detail view.
+export async function insertVerses(
+  fearId: string,
+  refs: NormalizedRef[],
+): Promise<VerseRow[]> {
+  if (!refs.length) return [];
+  const references = refs.map((r) => r.reference);
+  const translations = refs.map((r) => r.translation);
+  return (await sql`
+    insert into fear_verses (fear_id, reference, translation, position, text)
+    select ${fearId}::uuid, r.reference, r.translation, r.position,
+           (select text from verse_cache vc
+            where vc.reference = r.reference and vc.translation = r.translation
+            limit 1)
+    from unnest(${references}::text[], ${translations}::text[])
+      with ordinality as r(reference, translation, position)
+    returning *
+  `) as VerseRow[];
 }

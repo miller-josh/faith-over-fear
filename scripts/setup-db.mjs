@@ -16,12 +16,16 @@ if (!url) {
 const sql = neon(url);
 const schema = readFileSync(join(here, '..', 'db', 'schema.sql'), 'utf8');
 
-// Split on statement boundaries. The schema uses only simple statements,
-// so splitting on ";" at line ends is sufficient here.
+// Strip full-line "--" comments first, then split on statement boundaries.
+// (Stripping comments matters: a statement preceded by a comment block would
+// otherwise land in a chunk that starts with "--" and get dropped.)
 const statements = schema
+  .split('\n')
+  .filter((line) => !line.trim().startsWith('--'))
+  .join('\n')
   .split(/;\s*$/m)
   .map((s) => s.trim())
-  .filter((s) => s && !s.startsWith('--'));
+  .filter(Boolean);
 
 for (const statement of statements) {
   await sql.query(statement);

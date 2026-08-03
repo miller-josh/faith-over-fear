@@ -8,6 +8,7 @@ import {
 } from '../hooks/useFears.ts';
 import type { Draft } from '../lib/types.ts';
 import { cycleTopic, detectTopic } from '../lib/topics.ts';
+import { DEFAULT_TRANSLATION, TRANSLATIONS } from '../lib/translations.ts';
 
 const blankDraft = (): Draft => ({ fear: '', truth: '', topic: null, refs: [] });
 
@@ -32,7 +33,12 @@ export default function EntryForm() {
   useEffect(() => {
     if (editing && existing.data) {
       const f = existing.data;
-      setDraft({ fear: f.fear, truth: f.truth, topic: f.topic, refs: f.verses.map((v) => v.reference) });
+      setDraft({
+        fear: f.fear,
+        truth: f.truth,
+        topic: f.topic,
+        refs: f.verses.map((v) => ({ reference: v.reference, translation: v.translation })),
+      });
       setVerseText(
         Object.fromEntries(f.verses.filter((v) => v.text).map((v) => [v.reference, v.text as string])),
       );
@@ -45,11 +51,24 @@ export default function EntryForm() {
   const setFear = (v: string) =>
     setDraft((d) => ({ ...d, fear: v, topic: v.trim().length > 12 ? detectTopic(v) : null }));
 
-  const addRef = (ref: string) =>
-    setDraft((d) => (d.refs.includes(ref) ? d : { ...d, refs: [...d.refs, ref] }));
-  const removeRef = (ref: string) => setDraft((d) => ({ ...d, refs: d.refs.filter((r) => r !== ref) }));
+  const hasRef = (refs: Draft['refs'], ref: string) => refs.some((r) => r.reference === ref);
+  const addRef = (ref: string, translation = DEFAULT_TRANSLATION) =>
+    setDraft((d) =>
+      hasRef(d.refs, ref) ? d : { ...d, refs: [...d.refs, { reference: ref, translation }] },
+    );
+  const removeRef = (ref: string) =>
+    setDraft((d) => ({ ...d, refs: d.refs.filter((r) => r.reference !== ref) }));
   const toggleRef = (ref: string) =>
-    setDraft((d) => (d.refs.includes(ref) ? { ...d, refs: d.refs.filter((r) => r !== ref) } : { ...d, refs: [...d.refs, ref] }));
+    setDraft((d) =>
+      hasRef(d.refs, ref)
+        ? { ...d, refs: d.refs.filter((r) => r.reference !== ref) }
+        : { ...d, refs: [...d.refs, { reference: ref, translation: DEFAULT_TRANSLATION }] },
+    );
+  const setRefTranslation = (ref: string, translation: string) =>
+    setDraft((d) => ({
+      ...d,
+      refs: d.refs.map((r) => (r.reference === ref ? { ...r, translation } : r)),
+    }));
 
   const runSuggest = () => {
     if (!draft.fear.trim()) return;
@@ -199,7 +218,7 @@ export default function EntryForm() {
               Tap a reference to read it. Add the ones that land.
             </p>
             {suggestions.map((s) => {
-              const added = draft.refs.includes(s.reference);
+              const added = draft.refs.some((r) => r.reference === s.reference);
               const isOpen = !!openSuggestion[s.reference];
               return (
                 <div key={s.reference} style={{ borderTop: '1px solid var(--color-divider)', padding: '12px 0' }}>
@@ -229,13 +248,26 @@ export default function EntryForm() {
         )}
 
         <div style={{ borderTop: '2px solid var(--color-divider)' }}>
-          {draft.refs.map((ref) => (
-            <div key={ref} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--color-divider)' }}>
-              <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 15, flex: 'none' }}>{ref}</span>
-              <span className="text-muted" style={{ fontSize: 13, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {verseText[ref] || 'Added manually'}
+          {draft.refs.map((r) => (
+            <div key={r.reference} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--color-divider)', flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 15, flex: 'none' }}>{r.reference}</span>
+              <span className="text-muted" style={{ fontSize: 13, flex: 1, minWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {verseText[r.reference] || 'Added manually'}
               </span>
-              <button className="btn btn-ghost" onClick={() => removeRef(ref)} style={{ fontSize: 12 }}>
+              <select
+                className="input"
+                value={r.translation}
+                onChange={(e) => setRefTranslation(r.reference, e.target.value)}
+                aria-label={`Translation for ${r.reference}`}
+                style={{ width: 'auto', flex: 'none', minHeight: 30, fontSize: 12, padding: '4px 8px' }}
+              >
+                {TRANSLATIONS.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.short}
+                  </option>
+                ))}
+              </select>
+              <button className="btn btn-ghost" onClick={() => removeRef(r.reference)} style={{ fontSize: 12 }}>
                 Remove
               </button>
             </div>

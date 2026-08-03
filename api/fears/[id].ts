@@ -4,13 +4,15 @@ import { requireUser, readBody, methodNotAllowed } from '../_lib/http.js';
 import { serializeFear, isStatus } from '../_lib/serialize.js';
 import { detectTopic } from '../_lib/topics.js';
 import { hydrateVerse } from '../_lib/bible.js';
+import { normalizeRefs } from '../_lib/translations.js';
+import { insertVerses } from './index.js';
 
 interface UpdateBody {
   fear?: string;
   truth?: string;
   topic?: string;
   status?: string;
-  refs?: string[];
+  refs?: unknown;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -49,19 +51,25 @@ async function read(row: FearRow, res: VercelResponse) {
 
   // Lazily hydrate any verse whose text we don't yet have, and persist it so the
   // next read is instant.
+  await hydrateMissing(verses);
+
+  res.status(200).json({ fear: serializeFear(row, verses) });
+}
+
+// Fills in (and persists) verse text for any row we don't yet have, using each
+// verse's own translation. Mutates the rows in place.
+async function hydrateMissing(verses: VerseRow[]) {
   await Promise.all(
     verses
       .filter((v) => !v.text)
       .map(async (v) => {
-        const text = await hydrateVerse(v.reference);
+        const text = await hydrateVerse(v.reference, v.translation);
         if (text) {
           v.text = text;
           await sql`update fear_verses set text = ${text} where id = ${v.id}`;
         }
       }),
   );
-
-  res.status(200).json({ fear: serializeFear(row, verses) });
 }
 
 async function update(row: FearRow, req: VercelRequest, res: VercelResponse) {
@@ -91,20 +99,17 @@ async function update(row: FearRow, req: VercelRequest, res: VercelResponse) {
     returning *
   `) as FearRow[];
 
-  // If the client sent a verse list, replace the fear's verses wholesale.
+  // If the client sent a verse list, replace the fear's verses wholesale. This
+  // is also how a per-verse translation change lands: the client resends the
+  // full list with the new translation on the changed verse.
   let verses: VerseRow[];
   if (body.refs !== undefined) {
-    const refs = body.refs.map((r) => r.trim()).filter(Boolean);
+    const refs = normalizeRefs(body.refs);
     await sql`delete from fear_verses where fear_id = ${row.id}`;
-    verses = refs.length
-      ? ((await sql`
-          insert into fear_verses (fear_id, reference, position, text)
-          select ${row.id}::uuid, r.reference, r.position,
-                 (select text from verse_cache vc where vc.reference = r.reference limit 1)
-          from unnest(${refs}::text[]) with ordinality as r(reference, position)
-          returning *
-        `) as VerseRow[])
-      : [];
+    verses = await insertVerses(row.id, refs);
+    // Hydrate text for the (possibly newly-chosen) translations before
+    // responding, so a translation switch shows the passage without a reload.
+    await hydrateMissing(verses);
   } else {
     verses = await loadVerses(row.id);
   }

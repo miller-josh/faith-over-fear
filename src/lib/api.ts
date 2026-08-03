@@ -1,4 +1,4 @@
-import type { Fear, SuggestResult } from './types.ts';
+import type { Fear, SuggestResult, VerseRef } from './types.ts';
 
 // Thin fetch layer. Every call carries the Clerk session token as a Bearer
 // header; the server verifies it and scopes queries by the Clerk user id.
@@ -39,7 +39,7 @@ export function createApi(getToken: TokenGetter) {
     getFear: (id: string) =>
       authedFetch<{ fear: Fear }>(getToken, `/api/fears/${id}`).then((r) => r.fear),
 
-    createFear: (input: { fear: string; truth: string; topic?: string; refs: string[] }) =>
+    createFear: (input: { fear: string; truth: string; topic?: string; refs: VerseRef[] }) =>
       authedFetch<{ fear: Fear }>(getToken, '/api/fears', {
         method: 'POST',
         body: JSON.stringify(input),
@@ -47,7 +47,7 @@ export function createApi(getToken: TokenGetter) {
 
     updateFear: (
       id: string,
-      input: Partial<{ fear: string; truth: string; topic: string; status: string; refs: string[] }>,
+      input: Partial<{ fear: string; truth: string; topic: string; status: string; refs: VerseRef[] }>,
     ) =>
       authedFetch<{ fear: Fear }>(getToken, `/api/fears/${id}`, {
         method: 'PATCH',

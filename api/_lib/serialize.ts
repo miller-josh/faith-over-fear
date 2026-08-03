@@ -1,7 +1,10 @@
 import type { FearRow, VerseRow } from './db.js';
+import { isTranslationConfigured } from './bible.js';
 
 // The shape the API returns to the browser. Dates are ISO strings; the client
-// formats the date gutter. Verse text may be null until hydrated.
+// formats the date gutter. Verse text may be null until hydrated. `available`
+// is false when the verse's translation has no configured provider, so the
+// client can explain the missing text instead of waiting forever.
 export interface FearDTO {
   id: string;
   fear: string;
@@ -9,7 +12,7 @@ export interface FearDTO {
   topic: string;
   status: string;
   createdAt: string;
-  verses: { reference: string; text: string | null }[];
+  verses: { reference: string; translation: string; text: string | null; available: boolean }[];
 }
 
 export function serializeFear(row: FearRow, verses: VerseRow[]): FearDTO {
@@ -23,7 +26,12 @@ export function serializeFear(row: FearRow, verses: VerseRow[]): FearDTO {
     verses: verses
       .slice()
       .sort((a, b) => a.position - b.position)
-      .map((v) => ({ reference: v.reference, text: v.text })),
+      .map((v) => ({
+        reference: v.reference,
+        translation: v.translation,
+        text: v.text,
+        available: !!v.text || isTranslationConfigured(v.translation),
+      })),
   };
 }
 
