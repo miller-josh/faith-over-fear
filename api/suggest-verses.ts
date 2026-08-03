@@ -28,15 +28,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.status(500).json({ error: 'Verse suggestions are not configured on the server.' });
       return;
     }
-    // Surface the upstream detail (Anthropic error status + message — never the
-    // API key) so failures like model-access or bad-request are diagnosable
-    // instead of showing an opaque "could not reach" message.
-    const upstreamStatus = (err as { status?: unknown }).status;
-    const detail = err instanceof Error ? err.message : String(err);
-    res.status(502).json({
-      error: 'Could not reach the suggestion service. Try again.',
-      ...(typeof upstreamStatus === 'number' ? { upstreamStatus } : {}),
-      detail,
-    });
+    // A 400 from the Anthropic API is a request/account problem (e.g. an
+    // exhausted credit balance), not an unreachable service — the full detail
+    // is logged above for the operator. Keep the client message actionable.
+    if ((err as { status?: unknown }).status === 400) {
+      res.status(502).json({
+        error: 'The suggestion service rejected the request. Check the server logs and Anthropic billing.',
+      });
+      return;
+    }
+    res.status(502).json({ error: 'Could not reach the suggestion service. Try again.' });
   }
 }
