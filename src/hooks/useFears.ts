@@ -73,3 +73,16 @@ export function useSuggestVerses() {
   const api = useApi();
   return useMutation({ mutationFn: (fear: string) => api.suggestVerses(fear) });
 }
+
+// Fetches the text of one reference in one translation, cached by react-query so
+// switching a verse back to a translation already viewed is instant.
+export function useVerseTextLoader() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return (reference: string, translation: string) =>
+    qc.fetchQuery({
+      queryKey: ['verse-text', reference, translation],
+      queryFn: () => api.verseText(reference, translation),
+      staleTime: Infinity,
+    });
+}

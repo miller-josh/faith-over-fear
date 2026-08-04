@@ -62,6 +62,12 @@ export function createApi(getToken: TokenGetter) {
         method: 'POST',
         body: JSON.stringify({ fear }),
       }),
+
+    verseText: (reference: string, translation: string) =>
+      authedFetch<{ reference: string; translation: string; text: string | null; available: boolean }>(
+        getToken,
+        `/api/verse-text?reference=${encodeURIComponent(reference)}&translation=${encodeURIComponent(translation)}`,
+      ),
   };
 }
 
