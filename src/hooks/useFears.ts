@@ -6,7 +6,7 @@ import {
   type UseQueryResult,
 } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { createApi } from '../lib/api.ts';
+import { createApi, type BibleSummary } from '../lib/api.ts';
 import type { Fear } from '../lib/types.ts';
 
 // Binds the API client to the current Clerk session.
@@ -72,4 +72,23 @@ export function useDeleteFear() {
 export function useSuggestVerses() {
   const api = useApi();
   return useMutation({ mutationFn: (fear: string) => api.suggestVerses(fear) });
+}
+
+// Lists the Bible versions the server's API.Bible key can see (with their ids).
+export function useBibles(): UseQueryResult<BibleSummary[]> {
+  const api = useApi();
+  return useQuery({ queryKey: ['bibles'], queryFn: api.listBibles, staleTime: 5 * 60_000, retry: false });
+}
+
+// Fetches the text of one reference in one translation, cached by react-query so
+// switching a verse back to a translation already viewed is instant.
+export function useVerseTextLoader() {
+  const api = useApi();
+  const qc = useQueryClient();
+  return (reference: string, translation: string) =>
+    qc.fetchQuery({
+      queryKey: ['verse-text', reference, translation],
+      queryFn: () => api.verseText(reference, translation),
+      staleTime: Infinity,
+    });
 }

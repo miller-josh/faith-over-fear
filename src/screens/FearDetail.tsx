@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useDeleteFear, useFear, useUpdateFear } from '../hooks/useFears.ts';
 import type { Status } from '../lib/types.ts';
 import { dateParts } from '../lib/format.ts';
-import { TRANSLATIONS } from '../lib/translations.ts';
+import { TRANSLATIONS, translationLabel } from '../lib/translations.ts';
 import StatusTag from '../components/StatusTag.tsx';
 import DeleteDialog from '../components/DeleteDialog.tsx';
 
@@ -19,6 +19,9 @@ export default function FearDetail() {
   // The verse whose translation is currently being re-fetched, so we can show a
   // loading hint on just that row.
   const [changingRef, setChangingRef] = useState<string | null>(null);
+  // A message shown when a translation change fails to save, so the reverted
+  // picker isn't a silent no-op.
+  const [changeError, setChangeError] = useState<string | null>(null);
 
   if (isLoading) {
     return <p className="text-muted">Loading…</p>;
@@ -37,6 +40,17 @@ export default function FearDetail() {
   const { full } = dateParts(fear.createdAt);
   const setStatus = (status: Status) => update.mutate({ id: fear.id, status });
 
+  // Explains why a verse row has no text. The detail endpoint always attempts to
+  // hydrate before responding, so once we're here with no text it's settled:
+  // either the translation has no provider configured on the server (`available`
+  // is false), or it does but the passage lookup came back empty.
+  const missingTextNote = (translation: string, available: boolean): string => {
+    const name = translationLabel(translation);
+    return available
+      ? `Couldn’t load this passage in ${name}. Check that the reference is right — and if you just added this translation’s API key on the server, redeploy so the new key takes effect.`
+      : `The ${name} translation isn’t set up on the server yet — it needs its API key before its text can show. King James is available now.`;
+  };
+
   // Change the translation on one verse. The server replaces the verse list and
   // re-hydrates the passage text in the chosen translation, so we resend the
   // full list with the one verse's translation swapped.
@@ -44,6 +58,7 @@ export default function FearDetail() {
     const current = fear.verses.find((v) => v.reference === reference);
     if (!current || current.translation === translation) return;
     setChangingRef(reference);
+    setChangeError(null);
     setOpen((s) => ({ ...s, [reference]: true }));
     update.mutate(
       {
@@ -53,7 +68,13 @@ export default function FearDetail() {
           translation: v.reference === reference ? translation : v.translation,
         })),
       },
-      { onSettled: () => setChangingRef(null) },
+      {
+        onError: (err) =>
+          setChangeError(
+            (err as Error)?.message ?? 'Could not change the translation. Please try again.',
+          ),
+        onSettled: () => setChangingRef(null),
+      },
     );
   };
 
@@ -96,6 +117,11 @@ export default function FearDetail() {
           <div style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--color-accent-700)', marginBottom: 12 }}>
             Standing on
           </div>
+          {changeError && (
+            <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--color-accent-700)' }}>
+              {changeError}
+            </p>
+          )}
           <div style={{ borderTop: '2px solid var(--color-divider)' }}>
             {fear.verses.length === 0 && (
               <p className="text-muted" style={{ fontSize: 14, padding: '14px 0', margin: 0 }}>
@@ -132,6 +158,22 @@ export default function FearDetail() {
                       {v.reference}
                       <span style={{ color: 'var(--color-accent-700)', fontSize: 16 }}>{isOpen ? '−' : '+'}</span>
                     </button>
+                    {!isChanging && !v.text && (
+                      <span
+                        title={missingTextNote(v.translation, v.available)}
+                        style={{
+                          flex: 'none',
+                          fontSize: 10,
+                          letterSpacing: '.08em',
+                          textTransform: 'uppercase',
+                          color: 'var(--color-accent-700)',
+                          border: '1px solid var(--color-accent-300)',
+                          padding: '2px 6px',
+                        }}
+                      >
+                        {v.available ? 'Unavailable' : 'Key needed'}
+                      </span>
+                    )}
                     <select
                       className="input"
                       value={v.translation}
@@ -163,9 +205,7 @@ export default function FearDetail() {
                         ? 'Loading this translation…'
                         : v.text
                           ? v.text
-                          : v.available
-                            ? 'Verse text will load shortly.'
-                            : 'This translation isn’t set up yet — it needs a licensed API key on the server before its text can show. King James is available now.'}
+                          : missingTextNote(v.translation, v.available)}
                     </p>
                   )}
                 </div>

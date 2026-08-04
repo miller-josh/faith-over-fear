@@ -1,16 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   useCreateFear,
   useFear,
   useSuggestVerses,
   useUpdateFear,
+  useVerseTextLoader,
 } from '../hooks/useFears.ts';
 import type { Draft } from '../lib/types.ts';
 import { cycleTopic, detectTopic } from '../lib/topics.ts';
-import { DEFAULT_TRANSLATION, TRANSLATIONS } from '../lib/translations.ts';
+import { DEFAULT_TRANSLATION, TRANSLATIONS, translationLabel } from '../lib/translations.ts';
 
 const blankDraft = (): Draft => ({ fear: '', truth: '', topic: null, refs: [] });
+
+// A chosen verse's preview text is keyed by reference AND translation, so
+// switching versions shows the right passage rather than the previous one.
+const vkey = (reference: string, translation: string) => `${reference}|${translation}`;
 
 export default function EntryForm() {
   const { id } = useParams<{ id: string }>();
@@ -21,35 +26,84 @@ export default function EntryForm() {
   const create = useCreateFear();
   const update = useUpdateFear();
   const suggest = useSuggestVerses();
+  const loadVerseText = useVerseTextLoader();
 
   const [draft, setDraft] = useState<Draft>(blankDraft);
   const [manualRef, setManualRef] = useState('');
   const [openSuggestion, setOpenSuggestion] = useState<Record<string, boolean>>({});
-  // Verse text we already know (from the loaded entry or from suggestions), so
-  // the chosen-verse list and suggestion expanders can show it without a fetch.
+  // Preview text for each chosen verse, keyed by `reference|translation`. An
+  // empty string means "fetched, but no text available" (unset provider or a
+  // lookup that came back empty), which we message distinctly from "loading".
   const [verseText, setVerseText] = useState<Record<string, string>>({});
+  const [loadingText, setLoadingText] = useState<Record<string, boolean>>({});
+  // (reference|translation) pairs we've already requested, so re-renders and
+  // repeated selections don't refetch. A ref (not state) so it can guard the
+  // fetch without itself triggering renders.
+  const requested = useRef<Set<string>>(new Set());
 
-  // Populate the draft once when editing an existing entry.
+  // Fetches a verse's text for a translation once, filling `verseText`. Safe to
+  // call redundantly — the `requested` guard dedupes.
+  const ensureText = (reference: string, translation: string) => {
+    const key = vkey(reference, translation);
+    if (requested.current.has(key)) return;
+    requested.current.add(key);
+    setLoadingText((m) => ({ ...m, [key]: true }));
+    loadVerseText(reference, translation)
+      .then((r) => setVerseText((m) => ({ ...m, [key]: r.text ?? '' })))
+      .catch(() => setVerseText((m) => ({ ...m, [key]: '' })))
+      .finally(() => setLoadingText((m) => ({ ...m, [key]: false })));
+  };
+
+  // Preview every chosen verse in its current translation. Covers the initial
+  // seed, manual adds, adopted suggestions, and translation switches uniformly.
   useEffect(() => {
-    if (editing && existing.data) {
-      const f = existing.data;
-      setDraft({
-        fear: f.fear,
-        truth: f.truth,
-        topic: f.topic,
-        refs: f.verses.map((v) => ({ reference: v.reference, translation: v.translation })),
-      });
-      setVerseText(
-        Object.fromEntries(f.verses.filter((v) => v.text).map((v) => [v.reference, v.text as string])),
-      );
+    draft.refs.forEach((r) => ensureText(r.reference, r.translation));
+    // ensureText is stable enough for this; only the ref list should retrigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.refs]);
+
+  // Seed the draft from the loaded entry exactly once per entry id. We must not
+  // re-seed whenever `existing.data` changes reference: React Query hands back a
+  // fresh object on any background refetch (reconnect, post-save cache write),
+  // and re-running this would wipe the edits in progress — most visibly the
+  // verses and translations the user just changed. Keyed by id so navigating to
+  // a different entry's edit page still re-seeds.
+  const seededId = useRef<string | null>(null);
+  useEffect(() => {
+    const f = existing.data;
+    if (!editing || !f || seededId.current === f.id) return;
+    seededId.current = f.id;
+    setDraft({
+      fear: f.fear,
+      truth: f.truth,
+      topic: f.topic,
+      refs: f.verses.map((v) => ({ reference: v.reference, translation: v.translation })),
+    });
+    // Seed previews from text the entry already carries, and mark those pairs as
+    // requested so we don't refetch them.
+    const known: Record<string, string> = {};
+    for (const v of f.verses) {
+      if (v.text) {
+        known[vkey(v.reference, v.translation)] = v.text;
+        requested.current.add(vkey(v.reference, v.translation));
+      }
     }
+    setVerseText(known);
   }, [editing, existing.data]);
 
   const suggestions = suggest.data?.verses ?? [];
   const hasSuggestions = suggestions.length > 0 && !suggest.isPending;
 
   const setFear = (v: string) =>
-    setDraft((d) => ({ ...d, fear: v, topic: v.trim().length > 12 ? detectTopic(v) : null }));
+    setDraft((d) => ({
+      ...d,
+      fear: v,
+      // For a new entry, keep suggesting a topic live as the fear is written.
+      // When editing, preserve the entry's topic — re-detecting on every
+      // keystroke would silently discard the topic already saved on it. The
+      // "Change" button still lets the writer pick a different one by hand.
+      topic: editing ? d.topic : v.trim().length > 12 ? detectTopic(v) : null,
+    }));
 
   const hasRef = (refs: Draft['refs'], ref: string) => refs.some((r) => r.reference === ref);
   const addRef = (ref: string, translation = DEFAULT_TRANSLATION) =>
@@ -74,10 +128,6 @@ export default function EntryForm() {
     if (!draft.fear.trim()) return;
     suggest.mutate(draft.fear, {
       onSuccess: (result) => {
-        setVerseText((m) => ({
-          ...m,
-          ...Object.fromEntries(result.verses.map((v) => [v.reference, v.text])),
-        }));
         // Adopt the AI topic if we don't already have a chosen one.
         setDraft((d) => ({ ...d, topic: d.topic ?? result.topic }));
       },
@@ -97,6 +147,8 @@ export default function EntryForm() {
     if (!draft.truth.trim()) return "Add the truth you're choosing.";
     return 'Saved privately to your journal.';
   }, [draft.fear, draft.truth]);
+  const saveError = (update.error ?? create.error) as Error | null;
+  const saveErrorMessage = saveError?.message ?? null;
 
   const onSave = () => {
     if (saveDisabled) return;
@@ -238,7 +290,7 @@ export default function EntryForm() {
                   </div>
                   {isOpen && (
                     <p style={{ margin: '10px 0 0', fontSize: 14, lineHeight: 1.6, paddingLeft: 14, borderLeft: '2px solid var(--color-accent-300)', maxWidth: '52ch' }}>
-                      {s.text || verseText[s.reference] || 'Verse text will load shortly.'}
+                      {s.text || 'Verse text will load shortly.'}
                     </p>
                   )}
                 </div>
@@ -248,11 +300,26 @@ export default function EntryForm() {
         )}
 
         <div style={{ borderTop: '2px solid var(--color-divider)' }}>
-          {draft.refs.map((r) => (
+          {draft.refs.map((r) => {
+            const key = vkey(r.reference, r.translation);
+            const txt = verseText[key];
+            const isLoading = !!loadingText[key];
+            const unavailable = txt === '';
+            return (
             <div key={r.reference} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderBottom: '1px solid var(--color-divider)', flexWrap: 'wrap' }}>
               <span style={{ fontFamily: 'var(--font-heading)', fontWeight: 800, fontSize: 15, flex: 'none' }}>{r.reference}</span>
-              <span className="text-muted" style={{ fontSize: 13, flex: 1, minWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {verseText[r.reference] || 'Added manually'}
+              <span
+                className="text-muted"
+                title={unavailable ? `${translationLabel(r.translation)} isn’t available on the server yet.` : undefined}
+                style={{ fontSize: 13, flex: 1, minWidth: 120, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontStyle: isLoading || unavailable ? 'italic' : undefined }}
+              >
+                {isLoading
+                  ? `Loading ${translationLabel(r.translation)}…`
+                  : txt
+                    ? txt
+                    : unavailable
+                      ? `Not available in ${r.translation.toUpperCase()} yet`
+                      : ''}
               </span>
               <select
                 className="input"
@@ -271,7 +338,8 @@ export default function EntryForm() {
                 Remove
               </button>
             </div>
-          ))}
+            );
+          })}
         </div>
         {draft.refs.length === 0 && (
           <p className="text-muted" style={{ fontSize: 13, padding: '14px 0', borderBottom: '1px solid var(--color-divider)', margin: 0 }}>
@@ -307,8 +375,11 @@ export default function EntryForm() {
         <button className="btn btn-secondary" onClick={() => navigate('/')} style={{ minHeight: 42 }}>
           Cancel
         </button>
-        <span className="text-muted" style={{ fontSize: 12, marginLeft: 'auto' }}>
-          {saveHint}
+        <span
+          className={saveErrorMessage ? undefined : 'text-muted'}
+          style={{ fontSize: 12, marginLeft: 'auto', color: saveErrorMessage ? 'var(--color-accent-700)' : undefined }}
+        >
+          {saveErrorMessage ?? saveHint}
         </span>
       </div>
     </div>

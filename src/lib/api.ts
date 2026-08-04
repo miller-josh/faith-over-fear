@@ -62,7 +62,25 @@ export function createApi(getToken: TokenGetter) {
         method: 'POST',
         body: JSON.stringify({ fear }),
       }),
+
+    verseText: (reference: string, translation: string) =>
+      authedFetch<{ reference: string; translation: string; text: string | null; available: boolean }>(
+        getToken,
+        `/api/verse-text?reference=${encodeURIComponent(reference)}&translation=${encodeURIComponent(translation)}`,
+      ),
+
+    listBibles: () =>
+      authedFetch<{ bibles: BibleSummary[] }>(getToken, '/api/bibles').then((r) => r.bibles),
   };
+}
+
+// A Bible version visible to the server's API.Bible key, with the id to copy
+// into an API_BIBLE_ID_* env var.
+export interface BibleSummary {
+  id: string;
+  abbreviation: string;
+  name: string;
+  language: string;
 }
 
 export type Api = ReturnType<typeof createApi>;
