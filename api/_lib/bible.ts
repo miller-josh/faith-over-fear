@@ -7,14 +7,17 @@ import { DEFAULT_TRANSLATION, normalizeTranslation } from './translations.js';
 //
 // Providers:
 //   kjv  — bible-api.com, public domain, no key required.
-//   esv  — Crossway ESV API (api.esv.org); needs ESV_API_KEY.
-//   niv  — API.Bible (scripture.api.bible); needs API_BIBLE_KEY + API_BIBLE_ID_NIV.
-//   nkjv — API.Bible; needs API_BIBLE_KEY + API_BIBLE_ID_NKJV.
-//   nasb — API.Bible; needs API_BIBLE_KEY + API_BIBLE_ID_NASB.
+//   esv  — Crossway ESV API (api.esv.org) when ESV_API_KEY is set, else API.Bible.
+//   niv  — API.Bible (scripture.api.bible).
+//   nkjv — API.Bible.
+//   nasb — API.Bible.
 //
-// ESV/NIV/NKJV/NASB are copyrighted; the app ships without those keys and shows
-// a "not set up yet" note until they are configured. NIV in particular may not
-// be licensable on API.Bible depending on your account/region.
+// API.Bible uses a SINGLE shared key (API_BIBLE_KEY) for every version; the
+// version is selected by its bibleId, not a per-version key. So each API.Bible
+// translation needs the one API_BIBLE_KEY plus its own bibleId env var
+// (API_BIBLE_ID_ESV / _NIV / _NKJV / _NASB). ESV/NIV/NKJV/NASB are copyrighted;
+// the app shows a "not set up yet" note until a version's bibleId is configured.
+// NIV in particular may not be licensable on API.Bible depending on the account.
 
 const TIMEOUT_MS = 6000;
 
@@ -63,55 +66,132 @@ function bibleApiProvider(code: string): Provider {
   };
 }
 
-// Crossway ESV API — reference-based, returns plain text passages.
-const esvProvider: Provider = {
-  configured: () => !!process.env.ESV_API_KEY,
-  fetch: async (reference) => {
-    const key = process.env.ESV_API_KEY;
-    if (!key) return null;
-    const params = new URLSearchParams({
-      q: reference,
-      'include-passage-references': 'false',
-      'include-verse-numbers': 'false',
-      'include-first-verse-numbers': 'false',
-      'include-footnotes': 'false',
-      'include-headings': 'false',
-      'include-short-copyright': 'false',
-      'include-passage-horizontal-lines': 'false',
-      'include-heading-horizontal-lines': 'false',
-    });
-    const data = await getJson(`https://api.esv.org/v3/passage/text/?${params.toString()}`, {
-      headers: { Authorization: `Token ${key}` },
-    });
-    const passages = data?.passages;
-    if (!Array.isArray(passages) || !passages.length) return null;
-    return String(passages[0]).replace(/\s+/g, ' ').trim() || null;
-  },
+// USFM book codes API.Bible uses in passage ids (e.g. "2 Corinthians" → "2CO").
+// Covers the 66-book canon with the spellings the app is likely to produce
+// (AI suggestions and manual entry). Anything not here falls back to search.
+const BOOK_CODES: Record<string, string> = {
+  genesis: 'GEN', exodus: 'EXO', leviticus: 'LEV', numbers: 'NUM', deuteronomy: 'DEU',
+  joshua: 'JOS', judges: 'JDG', ruth: 'RUT', '1 samuel': '1SA', '2 samuel': '2SA',
+  '1 kings': '1KI', '2 kings': '2KI', '1 chronicles': '1CH', '2 chronicles': '2CH',
+  ezra: 'EZR', nehemiah: 'NEH', esther: 'EST', job: 'JOB', psalm: 'PSA', psalms: 'PSA',
+  proverbs: 'PRO', ecclesiastes: 'ECC', 'song of solomon': 'SNG', 'song of songs': 'SNG',
+  canticles: 'SNG', isaiah: 'ISA', jeremiah: 'JER', lamentations: 'LAM', ezekiel: 'EZK',
+  daniel: 'DAN', hosea: 'HOS', joel: 'JOL', amos: 'AMO', obadiah: 'OBA', jonah: 'JON',
+  micah: 'MIC', nahum: 'NAM', habakkuk: 'HAB', zephaniah: 'ZEP', haggai: 'HAG',
+  zechariah: 'ZEC', malachi: 'MAL', matthew: 'MAT', mark: 'MRK', luke: 'LUK', john: 'JHN',
+  acts: 'ACT', romans: 'ROM', '1 corinthians': '1CO', '2 corinthians': '2CO',
+  galatians: 'GAL', ephesians: 'EPH', philippians: 'PHP', colossians: 'COL',
+  '1 thessalonians': '1TH', '2 thessalonians': '2TH', '1 timothy': '1TI', '2 timothy': '2TI',
+  titus: 'TIT', philemon: 'PHM', hebrews: 'HEB', james: 'JAS', '1 peter': '1PE',
+  '2 peter': '2PE', '1 john': '1JN', '2 john': '2JN', '3 john': '3JN', jude: 'JUD',
+  revelation: 'REV', revelations: 'REV',
 };
 
-// API.Bible (scripture.api.bible) — used for the copyrighted translations that
-// aren't on Crossway. The bible id per translation is account-specific, so it
-// comes from an env var. We use the search endpoint so a human reference like
-// "Lamentations 3:22-23" resolves without building passage ids by hand.
+function bookCode(name: string): string | null {
+  const n = name
+    .trim()
+    .toLowerCase()
+    .replace(/\./g, '')
+    .replace(/\s+/g, ' ')
+    .replace(/^([123])\s*/, '$1 '); // "1john" → "1 john"
+  return BOOK_CODES[n] ?? null;
+}
+
+// Converts a human reference ("Isaiah 41:10-13") to an API.Bible passage id
+// ("ISA.41.10-ISA.41.13"). Returns null when it can't parse, so the caller can
+// fall back to the search endpoint.
+function toPassageId(reference: string): string | null {
+  const m = reference.trim().match(/^(.*?)[\s.]+(\d+):(\d+)(?:\s*[-–]\s*(?:(\d+):)?(\d+))?$/);
+  if (!m) return null;
+  const code = bookCode(m[1]);
+  if (!code) return null;
+  const [, , chapter, verse, endChapter, endVerse] = m;
+  const start = `${code}.${chapter}.${verse}`;
+  if (endVerse) return `${start}-${code}.${endChapter ?? chapter}.${endVerse}`;
+  return start;
+}
+
+// API.Bible (scripture.api.bible) uses ONE shared api-key for every version; the
+// version is chosen by its bibleId. Prefer the passages endpoint (clean plain
+// text via content-type=text); fall back to search when a reference doesn't
+// parse into a passage id.
+async function apiBibleFetch(bibleId: string, reference: string): Promise<string | null> {
+  const key = process.env.API_BIBLE_KEY;
+  if (!key) return null;
+  const headers = { 'api-key': key };
+  const base = `https://api.scripture.api.bible/v1/bibles/${encodeURIComponent(bibleId)}`;
+
+  const passageId = toPassageId(reference);
+  if (passageId) {
+    const params = new URLSearchParams({
+      'content-type': 'text',
+      'include-verse-numbers': 'false',
+      'include-chapter-numbers': 'false',
+      'include-titles': 'false',
+      'include-notes': 'false',
+      'include-verse-spans': 'false',
+    });
+    const data = await getJson(`${base}/passages/${encodeURIComponent(passageId)}?${params}`, { headers });
+    const content = data?.data?.content;
+    if (content) return stripHtml(String(content)) || null;
+  }
+
+  const data = await getJson(`${base}/search?query=${encodeURIComponent(reference)}&limit=1`, { headers });
+  const content = data?.data?.passages?.[0]?.content;
+  return content ? stripHtml(String(content)) || null : null;
+}
+
+// A translation served by API.Bible under the shared key. `idEnv` names the env
+// var holding this version's bibleId (which version the key resolves to).
 function apiBibleProvider(idEnv: string): Provider {
   const bibleId = () => process.env[idEnv];
-  const key = () => process.env.API_BIBLE_KEY;
   return {
-    configured: () => !!key() && !!bibleId(),
-    fetch: async (reference) => {
-      const k = key();
+    configured: () => !!process.env.API_BIBLE_KEY && !!bibleId(),
+    fetch: (reference) => {
       const id = bibleId();
-      if (!k || !id) return null;
-      const url =
-        `https://api.scripture.api.bible/v1/bibles/${encodeURIComponent(id)}` +
-        `/search?query=${encodeURIComponent(reference)}&limit=1`;
-      const data = await getJson(url, { headers: { 'api-key': k } });
-      const content = data?.data?.passages?.[0]?.content;
-      if (!content) return null;
-      return stripHtml(String(content)) || null;
+      return id ? apiBibleFetch(id, reference) : Promise.resolve(null);
     },
   };
 }
+
+// ESV can come from either provider. Prefer Crossway's dedicated ESV API when an
+// ESV_API_KEY is set; otherwise use API.Bible under the same shared key as the
+// other versions (with API_BIBLE_ID_ESV naming the bibleId).
+async function esvCrosswayFetch(reference: string): Promise<string | null> {
+  const key = process.env.ESV_API_KEY;
+  if (!key) return null;
+  const params = new URLSearchParams({
+    q: reference,
+    'include-passage-references': 'false',
+    'include-verse-numbers': 'false',
+    'include-first-verse-numbers': 'false',
+    'include-footnotes': 'false',
+    'include-headings': 'false',
+    'include-short-copyright': 'false',
+    'include-passage-horizontal-lines': 'false',
+    'include-heading-horizontal-lines': 'false',
+  });
+  const data = await getJson(`https://api.esv.org/v3/passage/text/?${params.toString()}`, {
+    headers: { Authorization: `Token ${key}` },
+  });
+  const passages = data?.passages;
+  if (!Array.isArray(passages) || !passages.length) return null;
+  return String(passages[0]).replace(/\s+/g, ' ').trim() || null;
+}
+
+const esvProvider: Provider = {
+  configured: () =>
+    !!process.env.ESV_API_KEY || (!!process.env.API_BIBLE_KEY && !!process.env.API_BIBLE_ID_ESV),
+  fetch: async (reference) => {
+    if (process.env.ESV_API_KEY) {
+      const text = await esvCrosswayFetch(reference);
+      if (text) return text;
+    }
+    const id = process.env.API_BIBLE_ID_ESV;
+    if (process.env.API_BIBLE_KEY && id) return apiBibleFetch(id, reference);
+    return null;
+  },
+};
 
 const PROVIDERS: Record<string, Provider> = {
   kjv: bibleApiProvider('kjv'),
