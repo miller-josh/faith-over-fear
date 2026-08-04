@@ -13,11 +13,12 @@ import { DEFAULT_TRANSLATION, normalizeTranslation } from './translations.js';
 //   nasb — API.Bible.
 //
 // API.Bible uses a SINGLE shared key (API_BIBLE_KEY) for every version; the
-// version is selected by its bibleId, not a per-version key. So each API.Bible
-// translation needs the one API_BIBLE_KEY plus its own bibleId env var
-// (API_BIBLE_ID_ESV / _NIV / _NKJV / _NASB). ESV/NIV/NKJV/NASB are copyrighted;
-// the app shows a "not set up yet" note until a version's bibleId is configured.
-// NIV in particular may not be licensable on API.Bible depending on the account.
+// version is selected by its bibleId, not a per-version key. Setting just
+// API_BIBLE_KEY is enough: at fetch time we query the bibles the key can see and
+// match each version by abbreviation, so bibleIds are discovered automatically.
+// API_BIBLE_ID_<VERSION> env vars remain as optional overrides (e.g. to pin a
+// specific edition). ESV/NIV/NKJV/NASB are copyrighted; a version the key can't
+// see just returns no text. NIV may not be licensable on API.Bible at all.
 
 const TIMEOUT_MS = 6000;
 
@@ -141,15 +142,61 @@ async function apiBibleFetch(bibleId: string, reference: string): Promise<string
   return content ? stripHtml(String(content)) || null : null;
 }
 
-// A translation served by API.Bible under the shared key. `idEnv` names the env
-// var holding this version's bibleId (which version the key resolves to).
-function apiBibleProvider(idEnv: string): Provider {
-  const bibleId = () => process.env[idEnv];
+// Abbreviations to look for in the key's bible list when auto-resolving a
+// translation's bibleId. Includes common edition suffixes API.Bible uses.
+const API_BIBLE_ABBRS: Record<string, string[]> = {
+  esv: ['ESV'],
+  niv: ['NIV', 'NIV11', 'NIV84'],
+  nkjv: ['NKJV'],
+  nasb: ['NASB', 'NASB2020', 'NASB95'],
+  kjv: ['KJV', 'ENGKJV'],
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let biblesCache: { at: number; list: any[] } | null = null;
+const BIBLES_TTL_MS = 10 * 60_000;
+
+// The bibles the shared key can see, cached briefly per warm instance so we
+// resolve ids without re-querying on every verse.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function accessibleBibles(): Promise<any[]> {
+  const key = process.env.API_BIBLE_KEY;
+  if (!key) return [];
+  if (biblesCache && Date.now() - biblesCache.at < BIBLES_TTL_MS) return biblesCache.list;
+  const data = await getJson('https://api.scripture.api.bible/v1/bibles?language=eng', {
+    headers: { 'api-key': key },
+  });
+  const list = Array.isArray(data?.data) ? data.data : [];
+  biblesCache = { at: Date.now(), list };
+  return list;
+}
+
+// Resolves the bibleId to use for a translation. Honors an explicit env override
+// (API_BIBLE_ID_<VERSION>) when set; otherwise queries the bibles the key can
+// see and matches by abbreviation — so setting just API_BIBLE_KEY is enough.
+async function resolveBibleId(code: string, idEnv: string): Promise<string | null> {
+  const override = process.env[idEnv];
+  if (override) return override;
+  const wanted = API_BIBLE_ABBRS[code] ?? [code.toUpperCase()];
+  const list = await accessibleBibles();
+  for (const abbr of wanted) {
+    const hit = list.find((b) =>
+      [b.abbreviation, b.abbreviationLocal].some((a) => String(a ?? '').toUpperCase() === abbr),
+    );
+    if (hit?.id) return String(hit.id);
+  }
+  return null;
+}
+
+// A translation served by API.Bible under the shared key. `configured` only
+// needs the key — the specific version's id is discovered at fetch time.
+function apiBibleProvider(code: string, idEnv: string): Provider {
   return {
-    configured: () => !!process.env.API_BIBLE_KEY && !!bibleId(),
-    fetch: (reference) => {
-      const id = bibleId();
-      return id ? apiBibleFetch(id, reference) : Promise.resolve(null);
+    configured: () => !!process.env.API_BIBLE_KEY,
+    fetch: async (reference) => {
+      if (!process.env.API_BIBLE_KEY) return null;
+      const id = await resolveBibleId(code, idEnv);
+      return id ? apiBibleFetch(id, reference) : null;
     },
   };
 }
@@ -180,25 +227,24 @@ async function esvCrosswayFetch(reference: string): Promise<string | null> {
 }
 
 const esvProvider: Provider = {
-  configured: () =>
-    !!process.env.ESV_API_KEY || (!!process.env.API_BIBLE_KEY && !!process.env.API_BIBLE_ID_ESV),
+  configured: () => !!process.env.ESV_API_KEY || !!process.env.API_BIBLE_KEY,
   fetch: async (reference) => {
     if (process.env.ESV_API_KEY) {
       const text = await esvCrosswayFetch(reference);
       if (text) return text;
     }
-    const id = process.env.API_BIBLE_ID_ESV;
-    if (process.env.API_BIBLE_KEY && id) return apiBibleFetch(id, reference);
-    return null;
+    if (!process.env.API_BIBLE_KEY) return null;
+    const id = await resolveBibleId('esv', 'API_BIBLE_ID_ESV');
+    return id ? apiBibleFetch(id, reference) : null;
   },
 };
 
 const PROVIDERS: Record<string, Provider> = {
   kjv: bibleApiProvider('kjv'),
   esv: esvProvider,
-  niv: apiBibleProvider('API_BIBLE_ID_NIV'),
-  nkjv: apiBibleProvider('API_BIBLE_ID_NKJV'),
-  nasb: apiBibleProvider('API_BIBLE_ID_NASB'),
+  niv: apiBibleProvider('niv', 'API_BIBLE_ID_NIV'),
+  nkjv: apiBibleProvider('nkjv', 'API_BIBLE_ID_NKJV'),
+  nasb: apiBibleProvider('nasb', 'API_BIBLE_ID_NASB'),
 };
 
 // Whether verse text for this translation can be fetched (its provider has the
@@ -207,6 +253,73 @@ const PROVIDERS: Record<string, Provider> = {
 export function isTranslationConfigured(translation: string): boolean {
   const provider = PROVIDERS[normalizeTranslation(translation)];
   return provider ? provider.configured() : false;
+}
+
+export interface BibleSummary {
+  id: string;
+  abbreviation: string;
+  name: string;
+  language: string;
+}
+
+export interface ListBiblesResult {
+  ok: boolean;
+  status?: number;
+  error?: string;
+  bibles?: BibleSummary[];
+}
+
+// Lists the Bibles the server's single API_BIBLE_KEY can see, so the exact
+// bibleId for each version can be copied into API_BIBLE_ID_* env vars. Surfaces
+// the upstream status (401 = bad key, 403 = not authorized) rather than
+// swallowing it, since that's the whole point of the diagnostic.
+export async function listBibles(
+  query: { language?: string; abbreviation?: string; name?: string; ids?: string } = {},
+): Promise<ListBiblesResult> {
+  const key = process.env.API_BIBLE_KEY;
+  if (!key) return { ok: false, error: 'API_BIBLE_KEY is not set on the server.' };
+
+  const params = new URLSearchParams({ 'include-full-details': 'false' });
+  if (query.abbreviation) params.set('abbreviation', query.abbreviation);
+  if (query.name) params.set('name', query.name);
+  if (query.ids) params.set('ids', query.ids);
+  // Default to English unless a narrower filter was given, to keep the list short.
+  if (query.language) params.set('language', query.language);
+  else if (!query.ids && !query.abbreviation && !query.name) params.set('language', 'eng');
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const res = await fetch(`https://api.scripture.api.bible/v1/bibles?${params}`, {
+      headers: { 'api-key': key },
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) {
+      const hint =
+        res.status === 401
+          ? ' The key looks invalid.'
+          : res.status === 403
+            ? ' The key is not authorized for this request.'
+            : '';
+      return { ok: false, status: res.status, error: `API.Bible returned ${res.status}.${hint}` };
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = (await res.json()) as any;
+    const list = Array.isArray(data?.data) ? data.data : [];
+    return {
+      ok: true,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      bibles: list.map((b: any) => ({
+        id: String(b.id ?? ''),
+        abbreviation: String(b.abbreviationLocal ?? b.abbreviation ?? ''),
+        name: String(b.nameLocal ?? b.name ?? ''),
+        language: String(b.language?.name ?? b.language?.id ?? ''),
+      })),
+    };
+  } catch {
+    return { ok: false, error: 'Could not reach API.Bible. Please try again.' };
+  }
 }
 
 // Reads cached verse text, tolerating any DB error (returns null so the caller

@@ -9,6 +9,7 @@ export default function Nav() {
   const navigate = useNavigate();
   const onDashboard = location.pathname === '/';
   const onNew = location.pathname === '/new';
+  const onVersions = location.pathname === '/versions';
 
   const linkStyle = (active: boolean): React.CSSProperties => ({
     fontFamily: 'var(--font-heading)',
@@ -57,6 +58,9 @@ export default function Nav() {
         </Link>
         <Link to="/new" style={linkStyle(onNew)}>
           New entry
+        </Link>
+        <Link to="/versions" style={linkStyle(onVersions)}>
+          Versions
         </Link>
         <UserButton appearance={userButtonAppearance} />
       </nav>

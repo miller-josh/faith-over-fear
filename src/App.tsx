@@ -5,6 +5,7 @@ import SignInScreen from './screens/SignInScreen.tsx';
 import Dashboard from './screens/Dashboard.tsx';
 import FearDetail from './screens/FearDetail.tsx';
 import EntryForm from './screens/EntryForm.tsx';
+import BibleVersions from './screens/BibleVersions.tsx';
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
               <Route path="/new" element={<EntryForm />} />
               <Route path="/fear/:id" element={<FearDetail />} />
               <Route path="/fear/:id/edit" element={<EntryForm />} />
+              <Route path="/versions" element={<BibleVersions />} />
               <Route path="*" element={<Dashboard />} />
             </Routes>
           </main>
