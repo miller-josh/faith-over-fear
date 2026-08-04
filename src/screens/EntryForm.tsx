@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   useCreateFear,
@@ -29,27 +29,41 @@ export default function EntryForm() {
   // the chosen-verse list and suggestion expanders can show it without a fetch.
   const [verseText, setVerseText] = useState<Record<string, string>>({});
 
-  // Populate the draft once when editing an existing entry.
+  // Seed the draft from the loaded entry exactly once per entry id. We must not
+  // re-seed whenever `existing.data` changes reference: React Query hands back a
+  // fresh object on any background refetch (reconnect, post-save cache write),
+  // and re-running this would wipe the edits in progress — most visibly the
+  // verses and translations the user just changed. Keyed by id so navigating to
+  // a different entry's edit page still re-seeds.
+  const seededId = useRef<string | null>(null);
   useEffect(() => {
-    if (editing && existing.data) {
-      const f = existing.data;
-      setDraft({
-        fear: f.fear,
-        truth: f.truth,
-        topic: f.topic,
-        refs: f.verses.map((v) => ({ reference: v.reference, translation: v.translation })),
-      });
-      setVerseText(
-        Object.fromEntries(f.verses.filter((v) => v.text).map((v) => [v.reference, v.text as string])),
-      );
-    }
+    const f = existing.data;
+    if (!editing || !f || seededId.current === f.id) return;
+    seededId.current = f.id;
+    setDraft({
+      fear: f.fear,
+      truth: f.truth,
+      topic: f.topic,
+      refs: f.verses.map((v) => ({ reference: v.reference, translation: v.translation })),
+    });
+    setVerseText(
+      Object.fromEntries(f.verses.filter((v) => v.text).map((v) => [v.reference, v.text as string])),
+    );
   }, [editing, existing.data]);
 
   const suggestions = suggest.data?.verses ?? [];
   const hasSuggestions = suggestions.length > 0 && !suggest.isPending;
 
   const setFear = (v: string) =>
-    setDraft((d) => ({ ...d, fear: v, topic: v.trim().length > 12 ? detectTopic(v) : null }));
+    setDraft((d) => ({
+      ...d,
+      fear: v,
+      // For a new entry, keep suggesting a topic live as the fear is written.
+      // When editing, preserve the entry's topic — re-detecting on every
+      // keystroke would silently discard the topic already saved on it. The
+      // "Change" button still lets the writer pick a different one by hand.
+      topic: editing ? d.topic : v.trim().length > 12 ? detectTopic(v) : null,
+    }));
 
   const hasRef = (refs: Draft['refs'], ref: string) => refs.some((r) => r.reference === ref);
   const addRef = (ref: string, translation = DEFAULT_TRANSLATION) =>
