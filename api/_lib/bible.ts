@@ -8,7 +8,7 @@ import { DEFAULT_TRANSLATION, normalizeTranslation } from './translations.js';
 // Providers:
 //   kjv  — bible-api.com, public domain, no key required.
 //   esv  — Crossway ESV API (api.esv.org) when ESV_API_KEY is set, else API.Bible.
-//   niv  — API.Bible (scripture.api.bible).
+//   niv  — API.Bible (rest.api.bible).
 //   nkjv — API.Bible.
 //   nasb — API.Bible.
 //
@@ -17,10 +17,24 @@ import { DEFAULT_TRANSLATION, normalizeTranslation } from './translations.js';
 // API_BIBLE_KEY is enough: at fetch time we query the bibles the key can see and
 // match each version by abbreviation, so bibleIds are discovered automatically.
 // API_BIBLE_ID_<VERSION> env vars remain as optional overrides (e.g. to pin a
-// specific edition). ESV/NIV/NKJV/NASB are copyrighted; a version the key can't
-// see just returns no text. NIV may not be licensable on API.Bible at all.
+// specific edition). ESV/NIV/NKJV/NASB are copyrighted; a version the key isn't
+// licensed for just returns no text. Calls go to the new-portal host by default
+// (see apiBibleBase / API_BIBLE_HOST).
 
 const TIMEOUT_MS = 6000;
+
+// API.Bible moved from the legacy `api.scripture.api.bible` host to the new
+// developer portal at `rest.api.bible`. Keys issued by the new portal (the only
+// place you can get one now) work on `rest.api.bible`; the legacy host is being
+// deprecated (cutover May 2026) and rejects new-portal keys. Default to the new
+// host so a freshly-issued key just works; API_BIBLE_HOST overrides it if a
+// legacy key ever needs the old host.
+function apiBibleBase(): string {
+  const host = (process.env.API_BIBLE_HOST || 'rest.api.bible')
+    .replace(/^https?:\/\//, '')
+    .replace(/\/+$/, '');
+  return `https://${host}/v1`;
+}
 
 interface Provider {
   // Whether this provider has everything it needs to fetch (keys/ids present).
@@ -112,15 +126,15 @@ function toPassageId(reference: string): string | null {
   return start;
 }
 
-// API.Bible (scripture.api.bible) uses ONE shared api-key for every version; the
-// version is chosen by its bibleId. Prefer the passages endpoint (clean plain
+// API.Bible uses ONE shared api-key for every version; the version is chosen by
+// its bibleId. Prefer the passages endpoint (clean plain
 // text via content-type=text); fall back to search when a reference doesn't
 // parse into a passage id.
 async function apiBibleFetch(bibleId: string, reference: string): Promise<string | null> {
   const key = process.env.API_BIBLE_KEY;
   if (!key) return null;
   const headers = { 'api-key': key };
-  const base = `https://api.scripture.api.bible/v1/bibles/${encodeURIComponent(bibleId)}`;
+  const base = `${apiBibleBase()}/bibles/${encodeURIComponent(bibleId)}`;
 
   const passageId = toPassageId(reference);
   if (passageId) {
@@ -163,7 +177,7 @@ async function accessibleBibles(): Promise<any[]> {
   const key = process.env.API_BIBLE_KEY;
   if (!key) return [];
   if (biblesCache && Date.now() - biblesCache.at < BIBLES_TTL_MS) return biblesCache.list;
-  const data = await getJson('https://api.scripture.api.bible/v1/bibles?language=eng', {
+  const data = await getJson(`${apiBibleBase()}/bibles?language=eng`, {
     headers: { 'api-key': key },
   });
   const list = Array.isArray(data?.data) ? data.data : [];
@@ -290,7 +304,7 @@ export async function listBibles(
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-    const res = await fetch(`https://api.scripture.api.bible/v1/bibles?${params}`, {
+    const res = await fetch(`${apiBibleBase()}/bibles?${params}`, {
       headers: { 'api-key': key },
       signal: controller.signal,
     });
