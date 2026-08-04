@@ -16,9 +16,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const userId = await requireUser(req, res);
   if (!userId) return;
 
-  if (req.method === 'GET') return list(userId, res);
-  if (req.method === 'POST') return create(userId, req, res);
-  return methodNotAllowed(res, ['GET', 'POST']);
+  try {
+    if (req.method === 'GET') return await list(userId, res);
+    if (req.method === 'POST') return await create(userId, req, res);
+    return methodNotAllowed(res, ['GET', 'POST']);
+  } catch (err) {
+    console.error('fears handler failed', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Something went wrong. Please try again.' });
+    }
+  }
 }
 
 async function list(userId: string, res: VercelResponse) {

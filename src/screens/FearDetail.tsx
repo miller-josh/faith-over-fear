@@ -19,6 +19,9 @@ export default function FearDetail() {
   // The verse whose translation is currently being re-fetched, so we can show a
   // loading hint on just that row.
   const [changingRef, setChangingRef] = useState<string | null>(null);
+  // A message shown when a translation change fails to save, so the reverted
+  // picker isn't a silent no-op.
+  const [changeError, setChangeError] = useState<string | null>(null);
 
   if (isLoading) {
     return <p className="text-muted">Loading…</p>;
@@ -55,6 +58,7 @@ export default function FearDetail() {
     const current = fear.verses.find((v) => v.reference === reference);
     if (!current || current.translation === translation) return;
     setChangingRef(reference);
+    setChangeError(null);
     setOpen((s) => ({ ...s, [reference]: true }));
     update.mutate(
       {
@@ -64,7 +68,13 @@ export default function FearDetail() {
           translation: v.reference === reference ? translation : v.translation,
         })),
       },
-      { onSettled: () => setChangingRef(null) },
+      {
+        onError: (err) =>
+          setChangeError(
+            (err as Error)?.message ?? 'Could not change the translation. Please try again.',
+          ),
+        onSettled: () => setChangingRef(null),
+      },
     );
   };
 
@@ -107,6 +117,11 @@ export default function FearDetail() {
           <div style={{ fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--color-accent-700)', marginBottom: 12 }}>
             Standing on
           </div>
+          {changeError && (
+            <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--color-accent-700)' }}>
+              {changeError}
+            </p>
+          )}
           <div style={{ borderTop: '2px solid var(--color-divider)' }}>
             {fear.verses.length === 0 && (
               <p className="text-muted" style={{ fontSize: 14, padding: '14px 0', margin: 0 }}>

@@ -111,6 +111,8 @@ export default function EntryForm() {
     if (!draft.truth.trim()) return "Add the truth you're choosing.";
     return 'Saved privately to your journal.';
   }, [draft.fear, draft.truth]);
+  const saveError = (update.error ?? create.error) as Error | null;
+  const saveErrorMessage = saveError?.message ?? null;
 
   const onSave = () => {
     if (saveDisabled) return;
@@ -321,8 +323,11 @@ export default function EntryForm() {
         <button className="btn btn-secondary" onClick={() => navigate('/')} style={{ minHeight: 42 }}>
           Cancel
         </button>
-        <span className="text-muted" style={{ fontSize: 12, marginLeft: 'auto' }}>
-          {saveHint}
+        <span
+          className={saveErrorMessage ? undefined : 'text-muted'}
+          style={{ fontSize: 12, marginLeft: 'auto', color: saveErrorMessage ? 'var(--color-accent-700)' : undefined }}
+        >
+          {saveErrorMessage ?? saveHint}
         </span>
       </div>
     </div>

@@ -129,9 +129,51 @@ export function isTranslationConfigured(translation: string): boolean {
   return provider ? provider.configured() : false;
 }
 
+// Reads cached verse text, tolerating any DB error (returns null so the caller
+// falls through to a live fetch instead of crashing the request).
+async function readCache(ref: string, tr: string): Promise<string | null> {
+  try {
+    const rows = (await sql`
+      select text from verse_cache
+      where reference = ${ref} and translation = ${tr}
+      limit 1
+    `) as { text: string }[];
+    return rows.length ? rows[0].text : null;
+  } catch {
+    return null;
+  }
+}
+
+// Persists fetched verse text. Best-effort: caching must never fail a request,
+// so every error is swallowed. Falls back to a plain insert when the upsert's
+// ON CONFLICT target is unavailable — some older databases were created without
+// the (reference, translation) unique constraint the upsert needs.
+async function writeCache(ref: string, tr: string, text: string): Promise<void> {
+  try {
+    await sql`
+      insert into verse_cache (reference, translation, text)
+      values (${ref}, ${tr}, ${text})
+      on conflict (reference, translation) do update set text = excluded.text
+    `;
+  } catch {
+    try {
+      await sql`
+        insert into verse_cache (reference, translation, text)
+        select ${ref}, ${tr}, ${text}
+        where not exists (
+          select 1 from verse_cache where reference = ${ref} and translation = ${tr}
+        )
+      `;
+    } catch {
+      /* give up on caching this one */
+    }
+  }
+}
+
 // Returns verse text for a single reference in a given translation, reading
 // through the cache. Returns null when the translation's provider isn't
-// configured or the fetch fails.
+// configured or the fetch fails. Never throws: a hydration failure must not be
+// able to crash the save/read that triggered it.
 export async function hydrateVerse(
   reference: string,
   translation: string = DEFAULT_TRANSLATION,
@@ -140,24 +182,19 @@ export async function hydrateVerse(
   if (!ref) return null;
   const tr = normalizeTranslation(translation);
 
-  const cached = (await sql`
-    select text from verse_cache
-    where reference = ${ref} and translation = ${tr}
-    limit 1
-  `) as { text: string }[];
-  if (cached.length) return cached[0].text;
+  const cached = await readCache(ref, tr);
+  if (cached !== null) return cached;
 
   const provider = PROVIDERS[tr];
   if (!provider || !provider.configured()) return null;
 
-  const text = await provider.fetch(ref);
-  if (text) {
-    await sql`
-      insert into verse_cache (reference, translation, text)
-      values (${ref}, ${tr}, ${text})
-      on conflict (reference, translation) do update set text = excluded.text
-    `;
+  let text: string | null = null;
+  try {
+    text = await provider.fetch(ref);
+  } catch {
+    text = null;
   }
+  if (text) await writeCache(ref, tr, text);
   return text;
 }
 

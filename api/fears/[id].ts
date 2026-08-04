@@ -34,10 +34,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   const row = owned[0];
 
-  if (req.method === 'GET') return read(row, res);
-  if (req.method === 'PATCH') return update(row, req, res);
-  if (req.method === 'DELETE') return remove(row, res);
-  return methodNotAllowed(res, ['GET', 'PATCH', 'DELETE']);
+  try {
+    if (req.method === 'GET') return await read(row, res);
+    if (req.method === 'PATCH') return await update(row, req, res);
+    if (req.method === 'DELETE') return await remove(row, res);
+    return methodNotAllowed(res, ['GET', 'PATCH', 'DELETE']);
+  } catch (err) {
+    console.error('fears/[id] handler failed', err);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Something went wrong saving this entry. Please try again.' });
+    }
+  }
 }
 
 async function loadVerses(fearId: string): Promise<VerseRow[]> {
@@ -56,20 +63,32 @@ async function read(row: FearRow, res: VercelResponse) {
   res.status(200).json({ fear: serializeFear(row, verses) });
 }
 
+// How long we let verse hydration hold up a response. Verses still missing text
+// after this stay null and fill in on the next read; this keeps a slow or flaky
+// Bible provider from timing out the whole function.
+const HYDRATE_BUDGET_MS = 4500;
+
 // Fills in (and persists) verse text for any row we don't yet have, using each
-// verse's own translation. Mutates the rows in place.
+// verse's own translation. Mutates the rows in place. Never throws, and never
+// blocks longer than HYDRATE_BUDGET_MS, so hydration can't fail or stall a save.
 async function hydrateMissing(verses: VerseRow[]) {
-  await Promise.all(
-    verses
-      .filter((v) => !v.text)
-      .map(async (v) => {
-        const text = await hydrateVerse(v.reference, v.translation);
-        if (text) {
-          v.text = text;
+  const work = verses
+    .filter((v) => !v.text)
+    .map(async (v) => {
+      const text = await hydrateVerse(v.reference, v.translation);
+      if (text) {
+        v.text = text;
+        try {
           await sql`update fear_verses set text = ${text} where id = ${v.id}`;
+        } catch {
+          /* the row still returns hydrated text; persistence is best-effort */
         }
-      }),
-  );
+      }
+    });
+  await Promise.race([
+    Promise.allSettled(work),
+    new Promise((resolve) => setTimeout(resolve, HYDRATE_BUDGET_MS)),
+  ]);
 }
 
 async function update(row: FearRow, req: VercelRequest, res: VercelResponse) {
